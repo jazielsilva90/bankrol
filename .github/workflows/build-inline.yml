@@ -1,0 +1,35 @@
+name: Build inline BANKROL
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'h0.txt'
+      - 'h1.txt'
+      - 'h2.txt'
+      - '.github/workflows/build-inline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate single-file index
+        shell: python
+        run: |
+          from pathlib import Path
+          b64 = ''.join(Path(f'h{i}.txt').read_text().strip() for i in range(3))
+          html = '''<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#07100f"><title>BANKROL 1.8.7</title><style>body{margin:0;background:#07100f;color:#f4f7f6;font:16px system-ui;display:grid;place-items:center;min-height:100vh}.box{text-align:center}.spin{width:34px;height:34px;border:3px solid #24413a;border-top-color:#00d084;border-radius:50%;animation:s 1s linear infinite;margin:auto auto 14px}@keyframes s{to{transform:rotate(360deg)}}.err{max-width:520px;padding:24px}</style></head><body><div class="box"><div class="spin"></div>Carregando BANKROL...</div><script>(async()=>{try{const b64=''' + repr(b64) + ''';const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));const html=await new Response(stream).text();if(!html.includes('Versão 1.8.7')||!html.includes('combinedOddInput')||!html.includes('Análise por faixa de cotação'))throw new Error('Conteúdo HTML incompleto');document.open();document.write(html);document.close()}catch(e){document.body.innerHTML='<div class="box err"><h2>Não foi possível carregar</h2><p>'+String(e.message||e)+'</p></div>'}})();</script></body></html>'''
+          Path('index.html').write_text(html)
+      - name: Commit generated index
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Gera index único sem fetch"
+          git push
