@@ -1,5 +1,6 @@
 name: Publicar BANKROL 1.8.9
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
