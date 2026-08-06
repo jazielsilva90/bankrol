@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Restaurar base compatível
+        run: curl -fsSL 'https://raw.githubusercontent.com/jazielsilva90/bankrol/5949ad76cf97e493a693c4eb2676feccceabc1d3/index.html' -o index.html
       - name: Atualizar index.html
         run: python publish_1_8_9.py
       - name: Validar JavaScript
@@ -29,6 +31,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git diff --cached --quiet || git commit -m "Publica BANKROL 1.8.9 com país e múltiplas"
+          git diff --cached --quiet || git commit -m "Publica BANKROL 1.8.9 diretamente"
           git push
-# disparo manual da publicação aprovada
