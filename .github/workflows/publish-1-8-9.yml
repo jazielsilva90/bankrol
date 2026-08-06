@@ -5,13 +5,18 @@ on:
     paths:
       - 'publish_1_8_9.py'
       - '.github/workflows/publish-1-8-9.yml'
+  pull_request:
+    types: [closed]
 permissions:
   contents: write
 jobs:
   publish:
+    if: github.event_name == 'push' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Restaurar base compatível
         run: curl -fsSL 'https://raw.githubusercontent.com/jazielsilva90/bankrol/5949ad76cf97e493a693c4eb2676feccceabc1d3/index.html' -o index.html
       - name: Atualizar index.html
@@ -32,4 +37,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
           git diff --cached --quiet || git commit -m "Publica BANKROL 1.8.9 diretamente"
-          git push
+          git push origin main
