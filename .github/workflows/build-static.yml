@@ -1,32 +1,33 @@
-name: Ajusta contagem semanal BANKROL
+name: Publicar BANKROL 1.8.9
 on:
   push:
     branches: [main]
     paths:
       - '.github/workflows/build-static.yml'
+      - 'publish_1_8_9.py'
 permissions:
   contents: write
 jobs:
-  patch:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Ajustar múltipla no dashboard semanal
+      - name: Atualizar index.html
+        run: python publish_1_8_9.py
+      - name: Validar JavaScript
         run: |
           python - <<'PY'
+          import re
           from pathlib import Path
-          p = Path('index.html')
-          s = p.read_text(encoding='utf-8')
-          old = '${weekdayAnalysis(analysisList)}'
-          new = '${weekdayAnalysis(list)}'
-          if old not in s:
-              raise SystemExit('Trecho esperado não encontrado')
-          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          h=Path('index.html').read_text(encoding='utf-8')
+          js='\n'.join(re.findall(r'<script>(.*?)</script>', h, flags=re.S))
+          Path('/tmp/bankrol.js').write_text(js, encoding='utf-8')
           PY
-      - name: Commit da correção
+          node --check /tmp/bankrol.js
+      - name: Commit da publicação
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git diff --cached --quiet || git commit -m "Corrige contagem de múltiplas no dashboard semanal"
+          git diff --cached --quiet || git commit -m "Publica BANKROL 1.8.9 com país e múltiplas"
           git push
