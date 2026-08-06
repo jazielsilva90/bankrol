@@ -31,3 +31,4 @@ jobs:
           git add index.html
           git diff --cached --quiet || git commit -m "Publica BANKROL 1.8.9 com país e múltiplas"
           git push
+# disparo manual da publicação aprovada
