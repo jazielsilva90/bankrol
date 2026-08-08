@@ -1,1 +1,1 @@
-const fs=require('fs');require('./build1820.js');const s=fs.readFileSync('history1821.txt','utf8');console.log('history1821 bytes',s.length);
+const fs=require('fs'),zlib=require('zlib');require('./build1820.js');const s=fs.readFileSync('history1821.txt','utf8').replace(/\s+/g,'');const h=zlib.gunzipSync(Buffer.from(s,'base64')).toString('utf8');console.log('history1821 decoded',h.length,h.includes('searchRowsForRecord'));
