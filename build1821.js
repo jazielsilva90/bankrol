@@ -1,0 +1,16 @@
+const fs=require('fs'),zlib=require('zlib'),crypto=require('crypto');
+require('./build1820.js');
+let html=fs.readFileSync('dist/index.html','utf8');
+const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
+if(!html.includes('Limpar filtros'))throw Error('Base 1.8.20 sem filtros esperados');
+const b64=fs.readFileSync('history1821.txt','utf8').replace(/\s+/g,'');
+const history=zlib.gunzipSync(Buffer.from(b64,'base64')).toString('utf8');
+const i=html.indexOf('function history(){'),j=html.indexOf('function rankings(){',i);
+if(i<0||j<0)throw Error('Histórico não encontrado na base 1.8.20');
+html=html.slice(0,i)+history+html.slice(j);
+html=html.replace(/<meta name="bankrol-release" content="[^"]+">/,'<meta name="bankrol-release" content="1.8.21-historico-multipla-rateio">');
+html=html.replace(/<title>[^<]*<\/title>/,'<title>Bankrol Lab — Histórico Múltiplas 1.8.21</title>');
+html=html.replace(/Versão 1\.8\.(?:\d+)(?:\.\d+)?[^<]*/,'Versão 1.8.21 — pesquisa do histórico considera seleções das múltiplas com rateio analítico.');
+if(!html.includes('Valor simulado ${money(fs.weight)}')||!html.includes('searchRowsForRecord'))throw Error('Patch 1.8.21 não aplicado');
+fs.writeFileSync('dist/index.html',html);
+console.log('BANKROL 1.8.21 gerado com sucesso');console.log('SHA-256:',sha(html));console.log('Bytes:',Buffer.byteLength(html));
