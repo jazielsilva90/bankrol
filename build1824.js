@@ -1,5 +1,5 @@
 const fs=require('fs'),crypto=require('crypto');
-require('./build1823.js');
+require('./build1823full.js');
 let html=fs.readFileSync('dist/index.html','utf8');
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
 if(sha(html)!=='ff962ab4afed8aae9f590b86602cfb1865362c848d8fc5b9a7fce9bdbb6c24bb')throw Error('Base 1.8.23 divergente: '+sha(html));
