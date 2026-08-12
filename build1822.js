@@ -1,0 +1,18 @@
+const fs=require('fs'),zlib=require('zlib'),crypto=require('crypto');
+require('./build1821.js');
+let html=fs.readFileSync('dist/index.html','utf8');
+const b64=fs.readFileSync('weekday1822.txt','utf8').replace(/\s+/g,'');
+const weekdayPatch=zlib.gunzipSync(Buffer.from(b64,'base64')).toString('utf8');
+if(!weekdayPatch.includes('weekdayRangeControl')||!weekdayPatch.includes("scope==='all'?records"))throw Error('Patch semanal 1.8.22 invalido');
+const start=html.indexOf('function weekdayAnalysis('),end=html.indexOf('function oddRangeAnalysis(',start);
+if(start<0||end<0)throw Error('Dashboard por dia da semana nao encontrado');
+html=html.slice(0,start)+weekdayPatch+html.slice(end);
+const oldCard='<article class="card category-card"><div class="card-head"><div><div class="ey">SEMANA</div><h3>Análise por dia da semana</h3></div></div>${weekdayAnalysis(list)}</article>';
+const newCard='<article class="card category-card"><div class="card-head"><div><div class="ey">SEMANA</div><h3>Análise por dia da semana</h3></div>${weekdayRangeControl()}</div>${weekdayAnalysis(list)}</article>';
+if(!html.includes(oldCard))throw Error('Card semanal original nao encontrado');
+html=html.replace(oldCard,newCard);
+html=html.replace(/<meta name="bankrol-release" content="[^"]+">/,'<meta name="bankrol-release" content="1.8.22-semana-mes-geral">');
+html=html.replace(/<title>[^<]*<\/title>/,'<title>Bankrol Lab - Semana por mês ou geral 1.8.22</title>');
+fs.writeFileSync('dist/index.html',html);
+const sha=crypto.createHash('sha256').update(html).digest('hex');
+console.log('BANKROL 1.8.22 gerado com sucesso');console.log('SHA-256:',sha);console.log('Bytes:',Buffer.byteLength(html));
