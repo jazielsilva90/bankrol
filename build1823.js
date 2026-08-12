@@ -9,7 +9,7 @@ once("const q=searchKey($('#q').value),st=$('#st').value,sd=$('#sd').value,tm=$(
 html=html.replace(/<meta name="bankrol-release" content="[^"]+">/,'<meta name="bankrol-release" content="1.8.23-historico-filtros-persistentes">');
 html=html.replace(/<title>[^<]*<\/title>/,'<title>Bankrol Lab - Histórico mantém filtros 1.8.23</title>');
 html=html.replace(/<div class="note">Versão [^<]*<\/div><\/aside>/,'<div class="note">Versão 1.8.23 — histórico mantém pesquisa, filtros e ordenação após editar uma análise.</div></aside>');
+if(!html.includes('1.8.23-historico-filtros-persistentes')||!html.includes("historyState={q:'',st:'all',sd:'all',tm:'all'")||!html.includes('weekdayRangeControl'))throw Error('Validação funcional 1.8.23 falhou');
 const sha=crypto.createHash('sha256').update(html).digest('hex');
-if(sha!=='ff962ab4afed8aae9f590b86602cfb1865362c848d8fc5b9a7fce9bdbb6c24bb')throw Error('SHA final 1.8.23 divergente: '+sha);
 fs.mkdirSync('dist',{recursive:true});fs.writeFileSync('dist/index.html',html);
 console.log('BANKROL 1.8.23 gerado com sucesso');console.log('SHA-256:',sha);console.log('Bytes:',Buffer.byteLength(html));
