@@ -1,0 +1,10 @@
+const fs=require('fs'),zlib=require('zlib'),crypto=require('crypto');
+const files=['a1823-00.txt','a1823-01.txt','a1823-02.txt','a1823-03.txt','a1823-04.txt','a1823-05.txt','a1823-06.txt','a1823-07.txt','a1823-08.txt','a1823-09.txt'];
+const b64=files.map(f=>fs.readFileSync(f,'utf8')).join('').replace(/\s+/g,'');
+if(b64.length!==37044)throw Error('Pacote BANKROL 1.8.23 incompleto: '+b64.length);
+const html=zlib.gunzipSync(Buffer.from(b64,'base64')).toString('utf8');
+const sha=crypto.createHash('sha256').update(html).digest('hex');
+if(sha!=='ff962ab4afed8aae9f590b86602cfb1865362c848d8fc5b9a7fce9bdbb6c24bb')throw Error('SHA BANKROL 1.8.23 divergente: '+sha);
+if(!html.includes('1.8.23-historico-filtros-persistentes')||!html.includes('weekdayRange')||!html.includes("historyState={q:'',st:'all',sd:'all',tm:'all'"))throw Error('Marcadores BANKROL 1.8.23 ausentes');
+fs.mkdirSync('dist',{recursive:true});fs.writeFileSync('dist/index.html',html);
+console.log('BANKROL 1.8.23 gerado com sucesso');console.log('SHA-256:',sha);console.log('Bytes:',Buffer.byteLength(html));
