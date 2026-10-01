@@ -205,6 +205,8 @@ tr:hover td{background:color-mix(in srgb,var(--sunk) 55%,transparent)}
             <label class="chk"><input type="checkbox" id="optPalavra"><span>Quebrar a descrição em palavra inteira<small>Desligado: corta no 50º caractere, igual à fórmula da planilha.</small></span></label>
             <label class="chk"><input type="checkbox" id="optUpper"><span>Converter todos os textos para MAIÚSCULAS</span></label>
             <label class="chk"><input type="checkbox" id="optAcento"><span>Remover acentos e cedilha</span></label>
+            <label class="chk"><input type="checkbox" id="optNfeFix" checked><span>Trocar caracteres especiais por equivalentes aceitos na NF-e<small>Aspas curvas viram ", travessão vira -, … vira ..., ½ vira 1/2 etc. Cada troca aparece como ajuste. Desligado: esses caracteres são erro.</small></span></label>
+            <label class="chk"><input type="checkbox" id="optXmlErr"><span>Tratar &amp; &lt; &gt; " ' como erro<small>Desligado: são aviso. São aceitos na NF-e, mas o emissor precisa convertê-los no XML; se não converter, a nota é rejeitada.</small></span></label>
             <label class="chk"><input type="checkbox" id="optTrunc"><span>Cortar textos maiores que o campo<small>Desligado: texto maior que o campo é erro.</small></span></label>
             <label class="chk"><input type="checkbox" id="optExtra"><span>Incluir os 5 campos novos da tabela no fim da linha<small>POSSUIICMSMONOFASICO, ALIQADREMICMS, REGIMEMISTOTIPO, ALIQICMSINTERESTADUAL, CODBENEFICIOFISCALUF. O modelo atual não envia esses campos.</small></span></label>
             <div>
@@ -277,6 +279,7 @@ tr:hover td{background:color-mix(in srgb,var(--sunk) 55%,transparent)}
 
         <div id="pLay" role="tabpanel" aria-labelledby="tabLay" hidden style="display:flex;flex-direction:column;gap:10px">
           <p class="hint">Ordem dos campos no TXT. Cada linha termina com <span class="code">|</span>, e o código é alinhado à direita com espaços até 13 posições. Números saem com vírgula decimal e datas como dd/mm/aaaa.</p>
+          <p class="hint">Todos os campos de texto passam pela regra de caracteres da NF-e: são aceitos letras, números, acentos do português e símbolos comuns (faixa U+0020 a U+00FF). O <span class="code">|</span> é barrado em qualquer campo. Aspas curvas, travessão, reticências de um caractere, emoji e caracteres invisíveis colados da internet são trocados ou apontados como erro.</p>
           <div class="tblwrap"><table>
             <thead><tr><th>#</th><th>Campo</th><th>Descrição</th><th>Obrig.</th><th>Tipo</th><th>Regra</th></tr></thead>
             <tbody id="tbLay"></tbody>
@@ -447,6 +450,25 @@ function gtinOk(s){
   return ((10-sum%10)%10) === +s[s.length-1];
 }
 
+// ---------------- caracteres aceitos na NF-e ----------------
+// O schema da NF-e (tipo TString) só aceita caracteres de U+0020 a U+00FF,
+// sem espaço no início ou no fim. Fora disso: rejeição 225 (falha no schema XML).
+const NFE_TROCA = {
+  '\u201C':'"','\u201D':'"','\u201E':'"','\u201F':'"','\u2033':'"','\u02BA':'"',
+  '\u2018':"'",'\u2019':"'",'\u201A':"'",'\u201B':"'",'\u2032':"'",'\u02BC':"'",
+  '\u2010':'-','\u2011':'-','\u2012':'-','\u2013':'-','\u2014':'-','\u2015':'-','\u2212':'-','\u2022':'-','\u2043':'-',
+  '\u2026':'...','\u2122':'TM','\u20AC':'EUR','\u2116':'No','\u2044':'/','\u2215':'/',
+  '\u2153':'1/3','\u2154':'2/3','\u2155':'1/5','\u2159':'1/6','\u215B':'1/8','\u215C':'3/8','\u215D':'5/8','\u215E':'7/8',
+  '\u2300':'\u00D8','\u2205':'\u00D8','\u03BC':'\u00B5','\u03A9':'OHM','\u2126':'OHM','\u2715':'X','\u2716':'X','\u2217':'*','\u2219':'.',
+  '\u0152':'OE','\u0153':'oe','\u0160':'S','\u0161':'s','\u017D':'Z','\u017E':'z','\u0178':'Y','\u0192':'f','\u02C6':'^','\u02DC':'~',
+  '\u2030':'%o','\u2020':'+','\u2021':'+','\u2039':'(','\u203A':')',
+};
+// invisíveis: controles, espaço sem quebra, larguras zero, hífen suave, marcas de direção
+const INVISIVEIS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u00AD\u200B-\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\uFEFF]/g;
+const ESPACOS = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g;
+const XML_ESP = /[&<>"']/;
+const uhex = ch => 'U+'+ch.codePointAt(0).toString(16).toUpperCase().padStart(4,'0');
+
 // mapa Windows-1252
 const CP1252 = (()=>{ const m=new Map(); const dec=new TextDecoder('windows-1252'); for(let b=0;b<256;b++){ const ch=dec.decode(new Uint8Array([b])); if(!m.has(ch)) m.set(ch,b);} return m; })();
 function encode1252(str){
@@ -558,8 +580,10 @@ function makeValidator(table, opts){
         return v;
       }
       case 'gtin': {
+        if(s==='SEM GTIN') return s;
         const ok = gtinOk(s);
-        if(ok===false) issue(line,f.n,'aviso','Dígito verificador do GTIN/EAN não confere.',s,'gtin');
+        if(ok===false){ issue(line,f.n,'erro','Dígito verificador do GTIN/EAN não confere. Na NF-e isso causa a rejeição 611 (cEAN inválido).',s,'gtin'); st.err=true; }
+        else if(ok===null) issue(line,f.n,'aviso','Não é um GTIN (8, 12, 13 ou 14 dígitos). Se este código vai para o cEAN da nota, use o GTIN ou SEM GTIN.',s,'gtinfmt');
         return s;
       }
     }
@@ -592,7 +616,7 @@ function makeValidator(table, opts){
     }
     let s = cleanText(v, f, line, st);
     if(s===''){ if(f.req){ issue(line,f.n,'erro','Campo obrigatório vazio.','','obrig'); st.err=true; } return ''; }
-    if(s.includes('|')){ issue(line,f.n,'erro','Contém o caractere | (barra vertical), que é o separador do TXT. Troque por outro caractere.',s,'pipe'); st.err=true; }
+    if(s.includes('|')){ issue(line,f.n,'erro','Contém o caractere | (pipe), que é o separador do TXT: ele desloca todos os campos seguintes da linha. Troque por / ou -.',s,'pipe'); st.err=true; }
     if(f.dom){
       let u=s.toUpperCase();
       if(f.dom===SN){ const map={SIM:'S',NAO:'N',TRUE:'S',FALSE:'N',VERDADEIRO:'S',FALSO:'N'}; const k=stripAcc(u); if(map[k]){ issue(line,f.n,'ajuste',`"${s}" convertido para ${map[k]}.`,s,'sn'); u=map[k]; } }
@@ -601,8 +625,36 @@ function makeValidator(table, opts){
     }
     if(f.fmt) s = fmtCheck(s, f, line, st, srcNumeric);
     if(f.n==='CODIGO' && srcNumeric) issue(line,f.n,'aviso','O código veio como número do Excel; se ele tinha zeros à esquerda, eles se perderam. Formate a coluna como Texto.',s,'codnum');
-    if(opts.enc==='ansi'){ const bad=badAnsiChars(s); if(bad.length) issue(line,f.n,'aviso',`Caractere(s) ${bad.join(' ')} não existem em ANSI e sairão como "?".`,s,'ansi'); }
+    s = nfeChars(s, f.n, line, st);
     s = checkLen(s, f, line, st);
+    return s;
+  }
+  function nfeChars(s, fn, line, st){
+    const o=s;
+    if(INVISIVEIS.test(s) || ESPACOS.test(s)){
+      INVISIVEIS.lastIndex=0; ESPACOS.lastIndex=0;
+      s=s.replace(INVISIVEIS,'').replace(ESPACOS,' ').trim();
+      issue(line,fn,'ajuste','Caractere invisível (espaço especial, controle ou marca de formatação) removido.',o,'invis');
+    }
+    INVISIVEIS.lastIndex=0; ESPACOS.lastIndex=0;
+    let fixed=[], bad=[];
+    let out='';
+    for(const ch of s){
+      const c=ch.codePointAt(0);
+      if(c>=0x20 && c<=0xFF){ out+=ch; continue; }
+      const t=NFE_TROCA[ch];
+      if(t!==undefined && opts.nfeFix){ out+=t; fixed.push(ch+' → '+t); continue; }
+      bad.push(t!==undefined ? `${ch} (${uhex(ch)}, troque por ${t})` : `${ch} (${uhex(ch)})`);
+      out+=ch;
+    }
+    if(fixed.length) issue(line,fn,'ajuste',`Caractere especial trocado: ${[...new Set(fixed)].join(', ')}.`,s,'nfefix');
+    if(bad.length){ issue(line,fn,'erro',`Caractere não aceito na NF-e: ${[...new Set(bad)].join(', ')}. Causa a rejeição 225 (falha no schema XML).`,s,'nfechar'); st.err=true; }
+    s=out;
+    if(XML_ESP.test(s)){
+      const ch=[...new Set(s.match(/[&<>"']/g))].join(' ');
+      if(opts.xmlErr){ issue(line,fn,'erro',`Contém ${ch}. Troque ou remova para não arriscar rejeição da NF-e.`,s,'xmlesp'); st.err=true; }
+      else issue(line,fn,'aviso',`Contém ${ch}. É aceito na NF-e, mas o emissor precisa converter no XML; se não converter, a nota é rejeitada.`,s,'xmlesp');
+    }
     return s;
   }
   function bump(n){ res.defaultsApplied[n]=(res.defaultsApplied[n]||0)+1; }
@@ -610,8 +662,8 @@ function makeValidator(table, opts){
   function splitDesc(full, line, st){
     const fd = PRODUTOS_FIELDS[2];
     let s = cleanText(full, fd, line, st);
-    if(s.includes('|')){ issue(line,'DESCRICAO','erro','Contém o caractere | (barra vertical), que é o separador do TXT. Troque por outro caractere.',s,'pipe'); st.err=true; }
-    if(opts.enc==='ansi'){ const bad=badAnsiChars(s); if(bad.length) issue(line,'DESCRICAO','aviso',`Caractere(s) ${bad.join(' ')} não existem em ANSI e sairão como "?".`,s,'ansi'); }
+    if(s.includes('|')){ issue(line,'DESCRICAO','erro','Contém o caractere | (pipe), que é o separador do TXT: ele desloca todos os campos seguintes da linha. Troque por / ou -.',s,'pipe'); st.err=true; }
+    s = nfeChars(s, 'DESCRICAO', line, st);
     if(s.length>100){
       if(opts.truncate){ issue(line,'DESCRICAO','aviso',`Descrição com ${s.length} caracteres cortada para 100.`,s,'cortado'); s=s.slice(0,100); }
       else { issue(line,'DESCRICAO','erro',`Descrição com ${s.length} caracteres; o máximo é 100 (50 da descrição + 50 do complemento).`,s,'desc100'); st.err=true; }
@@ -669,13 +721,13 @@ function makeValidator(table, opts){
 const GROUP_MSG = {
   obrig:'Campo obrigatório vazio', tamanho:'Texto maior que o tamanho do campo', cortado:'Texto cortado no tamanho do campo',
   num:'Valor não numérico', min:'Valor abaixo do mínimo', max:'Valor acima do máximo', int:'Deveria ser número inteiro',
-  data:'Data inválida', pipe:'Contém o separador |', dom:'Valor fora da lista aceita', sn:'SIM/NÃO convertido para S/N',
+  data:'Data inválida', pipe:'Contém o separador | (pipe)', dom:'Valor fora da lista aceita', sn:'SIM/NÃO convertido para S/N',
   ncm:'NCM inválido', ncmfmt:'NCM formatado com pontos', ncmzero:'NCM com zero à esquerda restaurado',
   cest:'CEST inválido', cestfmt:'CEST formatado com pontos', cestzero:'CEST com zero à esquerda restaurado',
   nbs:'NBS inválido', nbsfmt:'NBS formatado com pontos', cfop:'CFOP inválido', cfopfmt:'CFOP formatado com ponto', cfopini:'CFOP com 1º dígito inválido', cfopvd:'CFOP de venda fora de 5, 6 ou 7',
   icms:'CST/CSOSN de ICMS inválido', pis:'CST de PIS/COFINS inválido', pisdir:'CST de PIS/COFINS no sentido trocado', ipi:'CST de IPI inválido ou no sentido trocado',
-  tipoitem:'Tipo do item inválido', natrec:'Natureza da receita inválida', zero:'Zero à esquerda completado', gtin:'GTIN/EAN com dígito verificador errado',
-  codnum:'Código veio como número (zeros à esquerda podem ter sido perdidos)', ansi:'Caractere que não existe em ANSI', quebra:'Quebra de linha trocada por espaço',
+  tipoitem:'Tipo do item inválido', natrec:'Natureza da receita inválida', zero:'Zero à esquerda completado', gtin:'GTIN/EAN com dígito errado (rejeição 611)',
+  codnum:'Código veio como número (zeros à esquerda podem ter sido perdidos)', invis:'Caractere invisível removido', nfefix:'Caractere especial trocado por equivalente', nfechar:'Caractere não aceito na NF-e (rejeição 225)', xmlesp:'Contém & < > " \' (precisa ser convertido no XML)', gtinfmt:'Código de barras fora do formato GTIN', quebra:'Quebra de linha trocada por espaço',
   desc100:'Descrição com mais de 100 caracteres', peso:'Peso bruto menor que o líquido', conv:'Unidades diferentes sem taxa de conversão', conv0:'Taxa de conversão zero',
   pk:'Código de produto repetido', codbar:'Código de barras repetido',
 };
@@ -903,12 +955,12 @@ function loadOpts(){ try{ return JSON.parse(localStorage.getItem(OPTS_KEY)||'{}'
 function saveOpts(){ try{ localStorage.setItem(OPTS_KEY, JSON.stringify(readOpts(true))); }catch(e){} }
 function readOpts(raw){
   const defs={}; document.querySelectorAll('#defs input').forEach(i=>defs[i.dataset.f]=i.value.trim());
-  return { enc:$('enc').value, today:$('optHoje').checked, wordBreak:$('optPalavra').checked, upper:$('optUpper').checked, noAccents:$('optAcento').checked, truncate:$('optTrunc').checked, extra:$('optExtra').checked, defaults:defs };
+  return { enc:$('enc').value, today:$('optHoje').checked, wordBreak:$('optPalavra').checked, upper:$('optUpper').checked, noAccents:$('optAcento').checked, truncate:$('optTrunc').checked, nfeFix:$('optNfeFix').checked, xmlErr:$('optXmlErr').checked, extra:$('optExtra').checked, defaults:defs };
 }
 function initOpts(){
   const o=loadOpts(); const t=table();
   if(o.enc) $('enc').value=o.enc;
-  for(const [id,k] of [['optHoje','today'],['optPalavra','wordBreak'],['optUpper','upper'],['optAcento','noAccents'],['optTrunc','truncate'],['optExtra','extra']]) if(typeof o[k]==='boolean') $(id).checked=o[k];
+  for(const [id,k] of [['optHoje','today'],['optPalavra','wordBreak'],['optUpper','upper'],['optAcento','noAccents'],['optTrunc','truncate'],['optNfeFix','nfeFix'],['optXmlErr','xmlErr'],['optExtra','extra']]) if(typeof o[k]==='boolean') $(id).checked=o[k];
   const box=$('defs'); box.innerHTML='';
   for(const [f,v] of Object.entries(t.defaults)){
     const fd=t.fields.find(x=>x.n===f);
@@ -931,7 +983,7 @@ function ruleText(f){
   if(f.dom) return f.dom.join(' ou ')+(f.dom===SN?' (aceita SIM/NÃO)':'');
   const m={ncm:'0000.00.00 (aceita 8 dígitos sem ponto)',cest:'00.000.00 (aceita 7 dígitos)',nbs:'0.0000.00.00 (aceita 9 dígitos)',cfop:'0.000; começa com 1, 2, 3, 5, 6 ou 7',cfopvd:'0.000; normalmente 5, 6 ou 7',
     icms:'CST (00, 10, 20, 40, 60, 90…), CST com origem (000) ou CSOSN (101, 102, 500…)',pisS:'01 a 09, 49 ou 99',pisE:'50 a 56, 60 a 67, 70 a 75, 98 ou 99',ipiS:'50 a 55 ou 99',ipiE:'00 a 05 ou 49',
-    tipoitem:'00 a 10 ou 99',natrec:'3 dígitos',gtin:'Confere o dígito do GTIN/EAN; não pode repetir'};
+    tipoitem:'00 a 10 ou 99',natrec:'3 dígitos',gtin:'GTIN com dígito verificador válido ou SEM GTIN; não pode repetir'};
   let s = `Texto até ${f.len}`+(f.fmt?'. '+m[f.fmt]:'')+(f.n==='CODIGO'?'. Não pode repetir na mesma empresa; sai alinhado à direita':'');
   if(f.up) s+='. Sai em maiúsculas';
   return s+'.';
@@ -1115,7 +1167,7 @@ async function genModelo(){
     instr.push([]); instr.push(['Como preencher']);
     instr.push(['1','Preencha a aba PRODUTOS a partir da linha 3. Não apague as linhas 1 e 2.']);
     instr.push(['2','Campos com * são obrigatórios. Formate como Texto as colunas de código que têm zeros à esquerda (CODIGO, CSTs, TIPOITEM).']);
-    instr.push(['3','Não use o caractere | em nenhum campo.']);
+    instr.push(['3','Não use o caractere | (pipe) em nenhum campo. Evite também aspas curvas (“ ”), travessão (–), reticências (…), emoji e texto colado da internet: a NF-e rejeita esses caracteres.']);
     instr.push(['4','Envie a planilha no Importador de Cadastros TXT para validar e gerar o arquivo.']);
     instr.push([]); instr.push(['Tipo do item (TIPOITEM)']); for(const [k,v] of Object.entries(TIPOITEM_DESC)) instr.push([k,v]);
     const wi=XLSX.utils.aoa_to_sheet(instr); wi['!cols']=[{wch:24},{wch:46},{wch:12},{wch:12},{wch:70},{wch:18}];
@@ -1129,12 +1181,12 @@ async function genModelo(){
 const EXEMPLO = [
  'ABREV;CODIGO;DESCRICAO_COMPLETA;NUMFABRICANTE;UNIMED;UNIMEDFAT;CONVERTE;ALIQICMS;ALIQIPI;INCFISCAL;CODTRIBUTACAO;CLASFISCAL;DATACADASTRO;REFERALT;BLOQUEIA;CREDITOPIS;TIPOIPI;CREDITOCOFINS;ORIGEM;FERRAMENTA;LOTEECONOMICO;CODLOCALARM;TIPOCOMPRA;CONTROLESERIE;CSTPIS;CSTCOFINS;INSPSCQ;CODBAR;CEST;CODTRIBUTACAOENTRADA',
  'EMPR;0001;PARAFUSO SEXTAVADO ACO INOX M8 X 30 MM ROSCA TOTAL - CAIXA COM 100 UNIDADES;PSX-830;CX;CX;1;18;9,75;0;00;7318.15.00;02/09/2026;REF-0001;N;N;P;N;C;N;1;DVDA;CO;N;01;01;N;7891234567895;;00',
- 'EMPR;0002;ARRUELA LISA ACO ZINCADO 8 MM;ARL-08;PC;CX;;18;0;0;00;73182200;02/09/2026;REF-0002;N;N;P;N;C;N;1;DVDA;CO;N;1;1;N;;;00',
- 'EMPR;0003;OLEO LUBRIFICANTE MULTIUSO 300 ML;OL-300;UN;UN;1;18;0;0;60;2710.19.31;03/09/2026;REF-0003;N;N;P;N;C;N;1;DVDA;CO;N;01;01;N;7891234567890;06.001.00;60',
+ 'EMPR;0002;ARRUELA LISA ACO ZINCADO 5/16";ARL-08;PC;CX;;18;0;0;00;73182200;02/09/2026;REF-0002;N;N;P;N;C;N;1;DVDA;CO;N;1;1;N;;;00',
+ 'EMPR;0003;OLEO LUBRIFICANTE MULTIUSO 300 ML – SPRAY “ANTICORROSIVO”;OL-300;UN;UN;1;18;0;0;60;2710.19.31;03/09/2026;REF-0003;N;N;P;N;C;N;1;DVDA;CO;N;01;01;N;7891234567890;06.001.00;60',
  'EMPR;0001;PORCA SEXTAVADA M8;PS-08;UN;UN;1;18;0;0;00;7318.16.00;03/09/2026;;N;N;P;N;C;N;1;DVDA;CO;N;01;01;N;;;00',
  'EMPR;0005;CHAVE COMBINADA 13 MM | CROMO VANADIO;CC-13;;UN;1;18;0;0;00;8204.11.00;04/09/2026;;N;N;P;N;X;SIM;1;DVDA;CO;N;01;01;N;;;00',
  'EMPR;0006;FITA ISOLANTE 19 MM X 20 M;FI-1920;RL;RL;1;118;0;0;00;3919.10;04/09/2026;;N;N;P;N;C;N;1;DVDA;CO;N;01;01;N;;;00',
- 'EMPR;0007;LUVA DE PROTECAO NITRILICA TAMANHO G;LV-NG;PR;PR;1;18;0;0;00;4015.19.00;31/02/2026;;N;N;P;N;C;N;1;DVDA;CO;N;01;01;N;;;00',
+ 'EMPR;0007;LUVA DE PROTECAO NITRILICA TAMANHO G \u{1F9E4};LV-NG;PR;PR;1;18;0;0;00;4015.19.00;31/02/2026;;N;N;P;N;C;N;1;DVDA;CO;N;01;01;N;;;00',
 ].join('\n');
 function runExample(){
   try{ const r=fromText(table(),EXEMPLO); load(r.rows,{formato:'exemplo'},true); }catch(e){ console.error(e); }
@@ -1165,7 +1217,7 @@ function wire(){
   $('fBusca').addEventListener('input',()=>{probLimit=300;renderProblems();});
   $('btnMais').onclick=()=>{ probLimit+=300; renderProblems(); };
   const revalidate=()=>{ saveOpts(); groupFilter=''; if(state.rows) validate(); };
-  ['enc','optHoje','optPalavra','optUpper','optAcento','optTrunc','optExtra'].forEach(id=>$(id).addEventListener('change',revalidate));
+  ['enc','optHoje','optPalavra','optUpper','optAcento','optTrunc','optNfeFix','optXmlErr','optExtra'].forEach(id=>$(id).addEventListener('change',revalidate));
   $('defs').addEventListener('change',revalidate);
   $('btnCopiar').onclick=async()=>{ const a=$('copyArea'); try{ await navigator.clipboard.writeText(a.value); toast('Copiado.'); }catch(e){ a.focus(); a.select(); toast('Selecionado. Use Ctrl+C.'); } };
   $('btnFecharCopia').onclick=()=>{ $('copybox').hidden=true; };
