@@ -1,0 +1,1174 @@
+<title>Importador de Cadastros TXT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: bancada de trabalho em duas colunas — à esquerda o que entra (tabela, arquivo, opções), à direita o que sai (diagnóstico e TXT). */
+:root{
+  --bg:#eef1f0; --surface:#ffffff; --sunk:#e5eae8; --ink:#16201d; --muted:#596762; --line:#d0d8d5;
+  --accent:#0d5e66; --accent-ink:#ffffff; --accent-soft:#d9eaeb;
+  --err:#b42318; --err-soft:#fbe9e7; --warn:#8f5400; --warn-soft:#fbf0d6;
+  --fix:#36559a; --fix-soft:#e4eaf7; --ok:#1b6f44; --ok-soft:#dff0e6;
+  --pipe:#b8c4c0;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1413; --surface:#161f1e; --sunk:#111918; --ink:#e2eae7; --muted:#93a39e; --line:#2a3735;
+  --accent:#63b9bf; --accent-ink:#051f1e; --accent-soft:#163a3c;
+  --err:#ff8b7c; --err-soft:#3a1714; --warn:#efb752; --warn-soft:#33260f;
+  --fix:#97b0f1; --fix-soft:#1b2541; --ok:#72d39e; --ok-soft:#12301f; --pipe:#45524f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1413; --surface:#161f1e; --sunk:#111918; --ink:#e2eae7; --muted:#93a39e; --line:#2a3735;
+  --accent:#63b9bf; --accent-ink:#051f1e; --accent-soft:#163a3c;
+  --err:#ff8b7c; --err-soft:#3a1714; --warn:#efb752; --warn-soft:#33260f;
+  --fix:#97b0f1; --fix-soft:#1b2541; --ok:#72d39e; --ok-soft:#12301f; --pipe:#45524f; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--f-body);padding-inline:16px;padding-block:0 48px}
+.wrap{max-width:1320px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono)}
+.muted{color:var(--muted)}
+.tabnum{font-variant-numeric:tabular-nums}
+
+/* topo */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-block:28px 20px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.brand{display:flex;flex-direction:column;gap:4px}
+.brand .eyebrow{font:500 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.brand h1{font-size:28px;font-weight:700;letter-spacing:-.01em}
+.brand h1 .pipe{color:var(--accent);font-family:var(--f-mono);font-weight:500;margin-inline:2px}
+.top .lead{max-width:62ch;color:var(--muted);margin:0}
+
+.grid{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:920px){.grid{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.step{display:flex;align-items:baseline;gap:10px}
+.step .n{font:600 12px/1 var(--f-mono);color:var(--accent);border:1px solid var(--accent);border-radius:999px;width:22px;height:22px;display:inline-grid;place-items:center;flex:none;transform:translateY(-2px)}
+.step h2{font-size:17px;font-weight:600}
+label.lbl{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+select,input[type=text],input[type=date],textarea{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px 10px;width:100%}
+textarea{font-family:var(--f-mono);font-size:12px;resize:vertical;min-height:110px}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:8px 14px;cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08);color:var(--accent-ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.btn.small{padding:5px 10px;font-size:12.5px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:22px 14px;text-align:center;background:var(--sunk);cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:center;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{font-family:var(--f-display);font-size:16px;font-weight:600}
+.drop .types{font:12px var(--f-mono);color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:6px 12px;cursor:pointer;font-size:13px}
+.seg button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+.progress{height:6px;background:var(--sunk);border-radius:999px;overflow:hidden}
+.progress > i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+
+details.opts{border-top:1px solid var(--line);padding-top:10px}
+details.opts summary{cursor:pointer;font-weight:600;font-size:13px;list-style:none;display:flex;justify-content:space-between}
+details.opts summary::after{content:"+";font-family:var(--f-mono);color:var(--muted)}
+details.opts[open] summary::after{content:"−"}
+.optlist{display:flex;flex-direction:column;gap:9px;margin-top:10px}
+.chk{display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:start;font-size:13px}
+.chk input{margin:3px 0 0}
+.chk small{display:block;color:var(--muted);font-size:12px}
+.defs{display:grid;grid-template-columns:1fr 84px;gap:6px 10px;align-items:center;font-size:12.5px;margin-top:4px}
+.defs input{padding:4px 8px;font-family:var(--f-mono);font-size:12.5px}
+
+/* resultado */
+.status{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.status h2{font-size:20px;font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;font:600 12px/1 var(--f-mono);padding:5px 9px;border-radius:999px;letter-spacing:.02em}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.err{background:var(--err-soft);color:var(--err)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.ex{background:var(--fix-soft);color:var(--fix)}
+.meta{font-size:12.5px;color:var(--muted);margin:0}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+@media (max-width:560px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.tile b{font:600 24px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.tile span{font-size:12px;color:var(--muted)}
+.tile.err b{color:var(--err)} .tile.warn b{color:var(--warn)} .tile.ok b{color:var(--ok)}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:transparent;padding:9px 14px;cursor:pointer;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs .c{font:500 11px var(--f-mono);margin-left:6px;color:var(--muted)}
+
+.groups{display:flex;flex-direction:column;gap:6px}
+.grp{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-left-width:3px;border-radius:4px;background:var(--surface);cursor:pointer;text-align:left;width:100%}
+.grp.erro{border-left-color:var(--err)} .grp.aviso{border-left-color:var(--warn)} .grp.ajuste{border-left-color:var(--fix)}
+.grp:hover{background:var(--sunk)}
+.grp[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:-1px}
+.grp .f{font:500 12px var(--f-mono)}
+.grp .m{font-size:13px;min-width:0}
+.grp .k{font:600 12px var(--f-mono);color:var(--muted)}
+.sev{font:600 10.5px/1 var(--f-mono);text-transform:uppercase;letter-spacing:.06em;padding:4px 6px;border-radius:3px}
+.sev.erro{background:var(--err-soft);color:var(--err)} .sev.aviso{background:var(--warn-soft);color:var(--warn)} .sev.ajuste{background:var(--fix-soft);color:var(--fix)}
+
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.filters input[type=text]{max-width:260px}
+.filters select{width:auto}
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:4px;max-height:560px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{position:sticky;top:0;background:var(--sunk);font-size:11.5px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);z-index:1;white-space:nowrap}
+td.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+td code,.code{font:12px var(--f-mono);background:var(--sunk);padding:1px 5px;border-radius:3px;word-break:break-all}
+td code.fn{word-break:normal;white-space:nowrap}
+tr:hover td{background:color-mix(in srgb,var(--sunk) 55%,transparent)}
+
+.txt{font:12px/1.65 var(--f-mono);background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:10px 12px;overflow:auto;max-height:520px;white-space:pre;margin:0}
+.txt .p{color:var(--pipe)}
+.txt .ln{color:var(--muted);user-select:none;display:inline-block;min-width:4ch;margin-right:12px;text-align:right}
+.txt .bad{background:var(--err-soft)}
+
+.empty{padding:28px 12px;text-align:center;color:var(--muted)}
+.banner{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:4px;background:var(--fix-soft);color:var(--ink);font-size:13px}
+.banner b{color:var(--fix)}
+.banner.err{background:var(--err-soft)} .banner.err b{color:var(--err)}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:4px;font-size:13px;max-width:calc(100% - 32px);z-index:10}
+.copybox textarea{min-height:220px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">Importação de tabelas · layout TXT</span>
+      <h1>Importador de Cadastros<span class="pipe">|</span>TXT</h1>
+    </div>
+    <p class="lead">Escolha a tabela, envie a planilha preenchida e baixe o TXT no layout de importação. Todas as validações rodam aqui no navegador: o arquivo não é enviado para nenhum servidor.</p>
+  </header>
+
+  <div class="grid">
+    <!-- ENTRADA -->
+    <div class="col">
+      <section class="panel" aria-labelledby="s1">
+        <div class="step"><span class="n">1</span><h2 id="s1">Tabela</h2></div>
+        <select id="tabela" aria-label="Tabela para importar"></select>
+        <p class="hint" id="tabelaInfo"></p>
+        <div class="row">
+          <button class="btn small" id="btnModelo" type="button">Baixar modelo .xlsx</button>
+          <button class="btn small" id="btnLayout" type="button">Ver layout dos campos</button>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="s2">
+        <div class="step"><span class="n">2</span><h2 id="s2">Arquivo</h2></div>
+        <div class="seg" role="group" aria-label="Forma de envio">
+          <button type="button" id="modoArquivo" aria-pressed="true">Enviar arquivo</button>
+          <button type="button" id="modoColar" aria-pressed="false">Colar do Excel</button>
+        </div>
+        <div id="boxArquivo">
+          <label class="drop" id="drop" for="arquivo">
+            <strong>Arraste a planilha aqui</strong>
+            <span class="muted">ou clique para escolher</span>
+            <span class="types">.xlsx · .xlsm · .xls · .csv · .txt</span>
+          </label>
+          <input type="file" id="arquivo" accept=".xlsx,.xlsm,.xls,.ods,.csv,.txt" hidden>
+        </div>
+        <div id="boxColar" hidden>
+          <textarea id="colado" placeholder="Copie as linhas no Excel, incluindo a linha com os nomes dos campos (ABREV, CODIGO, ...), e cole aqui."></textarea>
+          <div class="row" style="margin-top:8px"><button class="btn primary small" id="btnColar" type="button">Validar dados colados</button></div>
+        </div>
+        <div id="prog" hidden>
+          <div class="progress"><i id="progBar"></i></div>
+          <p class="hint" id="progTxt">Lendo…</p>
+        </div>
+        <p class="hint">Aceita o modelo atual (nomes dos campos na linha 3), o modelo novo desta página, CSV com cabeçalho e também um TXT já gerado, para conferir.</p>
+
+        <details class="opts" id="opcoes">
+          <summary>Opções de geração</summary>
+          <div class="optlist">
+            <label class="lbl" for="enc">Codificação do TXT</label>
+            <select id="enc">
+              <option value="ansi">ANSI / Windows-1252 (padrão do Excel no Windows)</option>
+              <option value="utf8">UTF-8</option>
+            </select>
+            <label class="chk"><input type="checkbox" id="optHoje" checked><span>Data de cadastro vazia recebe a data de hoje<small>Sem isso, a linha fica com erro (campo obrigatório).</small></span></label>
+            <label class="chk"><input type="checkbox" id="optPalavra"><span>Quebrar a descrição em palavra inteira<small>Desligado: corta no 50º caractere, igual à fórmula da planilha.</small></span></label>
+            <label class="chk"><input type="checkbox" id="optUpper"><span>Converter todos os textos para MAIÚSCULAS</span></label>
+            <label class="chk"><input type="checkbox" id="optAcento"><span>Remover acentos e cedilha</span></label>
+            <label class="chk"><input type="checkbox" id="optTrunc"><span>Cortar textos maiores que o campo<small>Desligado: texto maior que o campo é erro.</small></span></label>
+            <label class="chk"><input type="checkbox" id="optExtra"><span>Incluir os 5 campos novos da tabela no fim da linha<small>POSSUIICMSMONOFASICO, ALIQADREMICMS, REGIMEMISTOTIPO, ALIQICMSINTERESTADUAL, CODBENEFICIOFISCALUF. O modelo atual não envia esses campos.</small></span></label>
+            <div>
+              <span class="lbl">Valores padrão para campos vazios</span>
+              <div class="defs" id="defs"></div>
+            </div>
+          </div>
+        </details>
+      </section>
+    </div>
+
+    <!-- SAÍDA -->
+    <div class="col">
+      <section class="panel" aria-live="polite">
+        <div class="status">
+          <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+            <h2 id="stTitulo">Resultado</h2>
+            <p class="meta" id="stMeta"></p>
+          </div>
+          <span class="pill" id="stPill"></span>
+        </div>
+        <div class="banner" id="exemplo" hidden><span><b>Exemplo.</b> Estes são dados de demonstração, para você ver como as validações aparecem. Envie a sua planilha no passo 2 para começar.</span></div>
+        <div class="banner err" id="falha" hidden></div>
+        <div class="tiles">
+          <div class="tile"><b id="tLidas">0</b><span>linhas lidas</span></div>
+          <div class="tile ok"><b id="tOk">0</b><span>prontas para o TXT</span></div>
+          <div class="tile err"><b id="tErr">0</b><span>linhas com erro</span></div>
+          <div class="tile warn"><b id="tAviso">0</b><span>avisos</span></div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="btnTxt" type="button" disabled>Gerar TXT</button>
+          <button class="btn" id="btnTxtValidas" type="button" hidden>Gerar só com as linhas válidas</button>
+          <button class="btn" id="btnRelatorio" type="button" disabled>Relatório de problemas (.csv)</button>
+        </div>
+        <div class="copybox" id="copybox" hidden>
+          <p class="hint">Este visualizador não permite baixar arquivos. Copie o conteúdo abaixo e salve como .txt.</p>
+          <textarea id="copyArea" readonly></textarea>
+          <div class="row" style="margin-top:8px"><button class="btn small" id="btnCopiar" type="button">Copiar</button><button class="btn small" id="btnFecharCopia" type="button">Fechar</button></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="tabs" role="tablist">
+          <button role="tab" id="tabProb" aria-selected="true" type="button">Problemas<span class="c" id="cProb">0</span></button>
+          <button role="tab" id="tabPrev" aria-selected="false" type="button">Prévia do TXT</button>
+          <button role="tab" id="tabLay" aria-selected="false" type="button">Layout dos campos<span class="c" id="cLay"></span></button>
+        </div>
+
+        <div id="pProb" role="tabpanel" aria-labelledby="tabProb" style="display:flex;flex-direction:column;gap:12px">
+          <div class="groups" id="grupos"></div>
+          <div class="filters">
+            <select id="fSev" aria-label="Filtrar por tipo">
+              <option value="">Todos os tipos</option><option value="erro">Erros</option><option value="aviso">Avisos</option><option value="ajuste">Ajustes automáticos</option>
+            </select>
+            <select id="fCampo" aria-label="Filtrar por campo"><option value="">Todos os campos</option></select>
+            <input type="text" id="fBusca" placeholder="Buscar linha, valor ou mensagem" aria-label="Buscar">
+            <span class="hint" id="fInfo"></span>
+          </div>
+          <div class="tblwrap"><table>
+            <thead><tr><th>Linha</th><th>Tipo</th><th>Campo</th><th>Valor</th><th>O que fazer</th></tr></thead>
+            <tbody id="tbProb"></tbody>
+          </table></div>
+          <div class="row"><button class="btn small" id="btnMais" type="button" hidden>Mostrar mais</button></div>
+        </div>
+
+        <div id="pPrev" role="tabpanel" aria-labelledby="tabPrev" hidden style="display:flex;flex-direction:column;gap:10px">
+          <p class="hint" id="prevInfo"></p>
+          <pre class="txt" id="prev"></pre>
+        </div>
+
+        <div id="pLay" role="tabpanel" aria-labelledby="tabLay" hidden style="display:flex;flex-direction:column;gap:10px">
+          <p class="hint">Ordem dos campos no TXT. Cada linha termina com <span class="code">|</span>, e o código é alinhado à direita com espaços até 13 posições. Números saem com vírgula decimal e datas como dd/mm/aaaa.</p>
+          <div class="tblwrap"><table>
+            <thead><tr><th>#</th><th>Campo</th><th>Descrição</th><th>Obrig.</th><th>Tipo</th><th>Regra</th></tr></thead>
+            <tbody id="tbLay"></tbody>
+          </table></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/*CORE-START*/
+'use strict';
+// ====================================================================
+// Tabelas suportadas. Para incluir outra tabela, adicione uma entrada
+// em TABLES com a lista de campos na ordem do TXT.
+// ====================================================================
+const SN = ['S','N'];
+const F = (n,l,t,o={}) => Object.assign({n,l,t},o);
+
+const PRODUTOS_FIELDS = [
+  F('ABREV','Abreviado da empresa','s',{len:8,req:1,up:1}),
+  F('CODIGO','Código do produto','s',{len:13,req:1,up:1,padL:13}),
+  F('DESCRICAO','Descrição (1ª parte)','s',{len:50,req:1,desc:1}),
+  F('COMPLEMENTO','Descrição (2ª parte / complemento)','s',{len:50,desc:1}),
+  F('NUMFABRICANTE','Número do fabricante','s',{len:18}),
+  F('UNIMED','Unidade de medida','s',{len:6,req:1,up:1}),
+  F('UNIMEDFAT','Unidade de medida de faturamento','s',{len:6,req:1,up:1}),
+  F('CONVERTE','Taxa de conversão','n',{min:0}),
+  F('ALIQICMS','Alíquota ICMS (%)','n',{min:0,max:100}),
+  F('ALIQIPI','Alíquota IPI','n',{min:0}),
+  F('CLASMAT','Classificação de material','s',{len:3,up:1}),
+  F('LINHAPRODUCAO','Linha de produção','s',{len:4,up:1}),
+  F('PESOLIQUIDO','Peso líquido','n',{min:0}),
+  F('PESOBRUTO','Peso bruto','n',{min:0}),
+  F('NUMVOLUMES','Número de volumes','n',{min:0}),
+  F('CODESPECIEVOL','Código de espécie dos volumes','s',{len:2,up:1}),
+  F('INCFISCAL','Incidência fiscal','s',{len:1,req:1,up:1}),
+  F('CODTRIBUTACAO','CST/CSOSN do ICMS','s',{len:3,req:1,fmt:'icms'}),
+  F('CLASFISCAL','NCM (com pontuação)','s',{len:12,req:1,fmt:'ncm'}),
+  F('DATACADASTRO','Data de cadastro','d',{req:1}),
+  F('REFERALT','Referência alternativa','s',{len:60}),
+  F('GRUPOS','Grupo','s',{len:4,up:1}),
+  F('ESTOQMINIMO','Estoque mínimo','n',{min:0}),
+  F('BLOQUEIA','Bloqueia produto?','s',{len:1,dom:SN}),
+  F('UNIDADEINT','UNIDADEINT','s',{len:1,up:1,semDesc:1}),
+  F('UNIDADEPESO','UNIDADEPESO','s',{len:1,up:1,semDesc:1}),
+  F('QUEBRAPR','Código de quebra de produto','s',{len:3,up:1}),
+  F('CREDITOPIS','Aproveita crédito PIS?','s',{len:1,dom:SN}),
+  F('TIPOIPI','Tipo de IPI (P = %, V = valor)','s',{len:1,dom:['P','V']}),
+  F('CODPRODDNF','Código do produto DNF','s',{len:3}),
+  F('CONVERSAOEST','Taxa de conversão estatística','n',{min:0}),
+  F('PORCCUSTOMAODEOBRA','% de custo de mão de obra','n',{min:0,max:100}),
+  F('CREDITOCOFINS','Aproveita crédito COFINS?','s',{len:1,dom:SN}),
+  F('AGRUPACARACT','AGRUPACARACT','s',{len:1,up:1,semDesc:1}),
+  F('RETEMINSS','Retém INSS?','s',{len:1,dom:SN}),
+  F('ORIGEM','Origem (C comprado, M manufaturado, R remanufaturado)','s',{len:1,dom:['C','M','R']}),
+  F('FERRAMENTA','Ferramenta?','s',{len:1,dom:SN}),
+  F('LOTEECONOMICO','Lote econômico','n',{min:0}),
+  F('LEADTIMEFORNECEDOR','Lead time do fornecedor','n',{min:0}),
+  F('CODLOCALARM','Principal local de armazenamento','s',{len:6,req:1,up:1}),
+  F('CODDEPART','Departamento','s',{len:16,up:1}),
+  F('TIPOCOMPRA','Tipo de compra','s',{len:2,up:1}),
+  F('TIPOFABRICACAO','Tipo de fabricação (L linha, E encomenda, D demanda)','s',{len:1,dom:['L','E','D']}),
+  F('CONTROLESERIE','Controle de série','s',{len:1,dom:SN}),
+  F('PORCOMISS','% de comissão','n',{min:0,max:100}),
+  F('CFOP','CFOP (com ponto)','s',{len:6,fmt:'cfop'}),
+  F('DESDOB','Desdobramento','s',{len:3}),
+  F('CSTPIS','CST PIS (saída)','s',{len:2,req:1,fmt:'pisS'}),
+  F('CSTCOFINS','CST COFINS (saída)','s',{len:2,req:1,fmt:'pisS'}),
+  F('CSTIPI','CST IPI (saída)','s',{len:2,req:1,fmt:'ipiS'}),
+  F('CSTIPIENTR','CST IPI (entrada)','s',{len:2,req:1,fmt:'ipiE'}),
+  F('TOLERANCIAVALID','Dias de tolerância da validade','n',{min:0,int:1}),
+  F('INSPSCQ','Inspecionado (CQ)?','s',{len:1,req:1,dom:SN}),
+  F('CODBAR','Código de barras (GTIN/EAN)','s',{len:50,fmt:'gtin',uniq:1}),
+  F('CFOPVD','CFOP de venda (com ponto)','s',{len:6,fmt:'cfopvd'}),
+  F('DESDOBVD','Desdobramento de venda','s',{len:3}),
+  F('REDICMS','Redução da base do ICMS?','s',{len:1,req:1,dom:SN}),
+  F('CSTPISENTR','CST PIS (entrada)','s',{len:2,fmt:'pisE'}),
+  F('CSTCOFINSENTR','CST COFINS (entrada)','s',{len:2,fmt:'pisE'}),
+  F('CODNATRECEITA','Natureza da receita (PIS/COFINS)','s',{len:3,fmt:'natrec'}),
+  F('MARCA','Marca','s',{len:12,up:1}),
+  F('ALIQPISDIF','Alíquota de PIS diferenciada','n',{min:0,max:100}),
+  F('ALIQCOFINSDIF','Alíquota de COFINS diferenciada','n',{min:0,max:100}),
+  F('NBS','NBS (com ponto)','s',{len:12,fmt:'nbs'}),
+  F('TIPOITEM','Tipo do item (SPED)','s',{len:2,fmt:'tipoitem'}),
+  F('CEST','CEST (com pontuação)','s',{len:9,fmt:'cest'}),
+  F('UNIDFRACENG','UNIDFRACENG','s',{len:1,up:1,semDesc:1}),
+  F('CODTRIBUTACAOENTRADA','CST/CSOSN do ICMS na compra','s',{len:3,req:1,fmt:'icms'}),
+  F('APURAICMSOUTORGADO','Apura ICMS outorgado?','s',{len:1,dom:SN}),
+  F('CBARRA','Código de barra próprio/terceiro','s',{len:30}),
+];
+const PRODUTOS_EXTRA = [
+  F('POSSUIICMSMONOFASICO','Possui ICMS monofásico?','s',{len:1,dom:SN,extra:1}),
+  F('ALIQADREMICMS','Alíquota ad rem do ICMS','n',{min:0,extra:1}),
+  F('REGIMEMISTOTIPO','Tipo de regime misto','s',{len:1,up:1,extra:1}),
+  F('ALIQICMSINTERESTADUAL','Alíquota ICMS interestadual (%)','n',{min:0,max:100,extra:1}),
+  F('CODBENEFICIOFISCALUF','Código de benefício fiscal (UF)','s',{len:10,up:1,extra:1}),
+];
+
+const TABLES = {
+  PRODUTOS: {
+    id:'PRODUTOS', nome:'PRODUTOS', titulo:'Cadastro de produtos',
+    info:'Tabela PRODUTOS. Chave: ABREV + CODIGO. A descrição completa (até 100 caracteres) é dividida em DESCRICAO e COMPLEMENTO.',
+    fields: PRODUTOS_FIELDS, extra: PRODUTOS_EXTRA, pk:['ABREV','CODIGO'],
+    // valores que o modelo atual já vinha pré-preenchidos
+    defaults: {CSTPIS:'01', CSTCOFINS:'01', CSTIPI:'50', CSTIPIENTR:'00', REDICMS:'N', TIPOITEM:'04'},
+    descFull: 'DESCRICAO_COMPLETA',
+  },
+};
+
+// ---------------- tabelas fiscais ----------------
+const range = (a,b) => Array.from({length:b-a+1},(_,i)=>String(a+i).padStart(2,'0'));
+const CST_ICMS = ['00','02','10','15','20','30','40','41','50','51','53','60','61','70','90'];
+const CSOSN = ['101','102','103','201','202','203','300','400','500','900'];
+const PIS_S = [...range(1,9),'49','99'];
+const PIS_E = [...range(50,56),...range(60,67),...range(70,75),'98','99'];
+const IPI_S = ['50','51','52','53','54','55','99'];
+const IPI_E = ['00','01','02','03','04','05','49'];
+const TIPOITEM = [...range(0,10),'99'];
+const TIPOITEM_DESC = {'00':'Mercadoria para revenda','01':'Matéria-prima','02':'Embalagem','03':'Produto em processo','04':'Produto acabado','05':'Subproduto','06':'Produto intermediário','07':'Material de uso e consumo','08':'Ativo imobilizado','09':'Serviços','10':'Outros insumos','99':'Outras'};
+
+// ---------------- utilidades ----------------
+const stripAcc = s => s.normalize('NFD').replace(/[̀-ͯ]/g,'').normalize('NFC');
+const normHead = s => stripAcc(String(s)).toUpperCase().replace(/[^A-Z0-9]/g,'');
+function colLetter(i){ let s=''; i++; while(i>0){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26);} return s; }
+function colIndex(l){ let n=0; for(let i=0;i<l.length;i++) n=n*26+(l.charCodeAt(i)-64); return n-1; }
+function numToStr(n){
+  if(!isFinite(n)) return String(n);
+  if(Number.isInteger(n)) return String(n);
+  let s = String(Number(n.toFixed(10)));
+  if(/e/i.test(s)) s = n.toFixed(10).replace(/0+$/,'').replace(/\.$/,'');
+  return s;
+}
+function fmtNumBR(n){ return numToStr(n).replace('.',','); }
+function parseNum(v){
+  if(typeof v==='number') return v;
+  if(typeof v==='boolean') return v?1:0;
+  let s = String(v).trim().replace(/\s/g,'').replace(/^R\$/i,'').replace(/%$/,'');
+  if(!s) return null;
+  if(s.includes(',')) s = s.replace(/\./g,'').replace(',', '.');
+  else if((s.match(/\./g)||[]).length>1) s = s.replace(/\./g,'');
+  if(!/^[-+]?(\d+\.?\d*|\.\d+)$/.test(s)) return NaN;
+  return parseFloat(s);
+}
+const pad2 = n => String(n).padStart(2,'0');
+function serialToDate(n){ const ms = Math.round((n-25569)*86400000); const d=new Date(ms); return {y:d.getUTCFullYear(),m:d.getUTCMonth()+1,d:d.getUTCDate()}; }
+function validYMD(y,m,d){ if(m<1||m>12||d<1) return false; const dm=new Date(Date.UTC(y,m,0)).getUTCDate(); return d<=dm; }
+function parseDate(v){
+  if(typeof v==='number'){ if(v<1||v>2958465) return null; return serialToDate(v); }
+  const s=String(v).trim();
+  let m;
+  if((m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})(?:[ T].*)?$/))){
+    let y=+m[3]; if(m[3].length===2) y+= y<50?2000:1900;
+    return validYMD(y,+m[2],+m[1])?{y,m:+m[2],d:+m[1]}:null;
+  }
+  if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T].*)?$/))) return validYMD(+m[1],+m[2],+m[3])?{y:+m[1],m:+m[2],d:+m[3]}:null;
+  if(/^\d+(\.\d+)?$/.test(s)) return parseDate(parseFloat(s));
+  return null;
+}
+const fmtDate = o => pad2(o.d)+'/'+pad2(o.m)+'/'+o.y;
+function todayObj(){ const d=new Date(); return {y:d.getFullYear(),m:d.getMonth()+1,d:d.getDate()}; }
+function gtinOk(s){
+  if(!/^\d+$/.test(s) || ![8,12,13,14].includes(s.length)) return null;
+  let sum=0; const body=s.slice(0,-1);
+  for(let i=body.length-1,w=3;i>=0;i--,w=w===3?1:3) sum+= (+body[i])*w;
+  return ((10-sum%10)%10) === +s[s.length-1];
+}
+
+// mapa Windows-1252
+const CP1252 = (()=>{ const m=new Map(); const dec=new TextDecoder('windows-1252'); for(let b=0;b<256;b++){ const ch=dec.decode(new Uint8Array([b])); if(!m.has(ch)) m.set(ch,b);} return m; })();
+function encode1252(str){
+  const out=new Uint8Array(str.length); let j=0;
+  for(const ch of str){ const b=CP1252.get(ch); out[j++] = b===undefined?63:b; }
+  return out.subarray(0,j);
+}
+function badAnsiChars(s){ const bad=new Set(); for(const ch of s){ if(!CP1252.has(ch)) bad.add(ch);} return [...bad]; }
+
+// ====================================================================
+// Validação
+// ====================================================================
+function makeValidator(table, opts){
+  const fields = opts.extra ? table.fields.concat(table.extra) : table.fields;
+  const defaults = opts.defaults || {};
+  const seenPK = new Map(), seenBar = new Map();
+  const res = { total:0, ok:0, bad:0, lines:[], issues:[], groups:new Map(), counts:{erro:0,aviso:0,ajuste:0}, defaultsApplied:{}, maxIssues:200000, dropped:0 };
+
+  function issue(line, f, sev, msg, val, key){
+    res.counts[sev]++;
+    const gk = sev+'|'+f+'|'+(key||msg);
+    let g = res.groups.get(gk);
+    if(!g){ g={sev,field:f,msg:key?keyMsg(key,msg):msg,count:0,first:line,key:gk}; res.groups.set(gk,g); }
+    g.count++;
+    if(res.issues.length < res.maxIssues) res.issues.push({line,field:f,sev,msg,val:val==null?'':String(val),gk});
+    else res.dropped++;
+  }
+  function keyMsg(key,msg){ return GROUP_MSG[key] || msg; }
+
+  function cleanText(v, f, line, st){
+    let s = typeof v==='number' ? numToStr(v) : typeof v==='boolean' ? (v?'S':'N') : String(v);
+    if(/[\r\n\t]/.test(s)){ const o=s; s=s.replace(/[\r\n\t]+/g,' '); issue(line,f.n,'ajuste','Quebra de linha ou tabulação trocada por espaço.',o,'quebra'); }
+    s = s.trim();
+    if(opts.noAccents) s = stripAcc(s);
+    if(f.up || opts.upper) s = s.toUpperCase();
+    return s;
+  }
+
+  function checkLen(s, f, line, st, max){
+    max = max || f.len;
+    if(max && s.length>max){
+      if(opts.truncate){ issue(line,f.n,'aviso',`Texto com ${s.length} caracteres cortado para ${max}.`,s,'cortado'); return s.slice(0,max); }
+      issue(line,f.n,'erro',`Tem ${s.length} caracteres; o máximo é ${max}.`,s,'tamanho'); st.err=true;
+    }
+    return s;
+  }
+
+  function fmtCheck(s, f, line, st, src){
+    const err = (m,k)=>{ issue(line,f.n,'erro',m,s,k); st.err=true; };
+    const adj = (m,o,k)=>issue(line,f.n,'ajuste',m,o,k);
+    const digits = s.replace(/\D/g,'');
+    switch(f.fmt){
+      case 'ncm':
+        if(/^\d{4}\.\d{2}\.\d{2}$/.test(s)) return s;
+        if(/^\d{8}$/.test(digits) && /^[\d.\s-]+$/.test(s)){ const o=s; s=digits.slice(0,4)+'.'+digits.slice(4,6)+'.'+digits.slice(6); adj('NCM formatado com pontos.',o,'ncmfmt'); return s; }
+        if(/^\d{7}$/.test(digits) && typeof src==='number'){ const d='0'+digits; adj('NCM veio como número e perdeu o zero à esquerda; zero restaurado.',s,'ncmzero'); return d.slice(0,4)+'.'+d.slice(4,6)+'.'+d.slice(6); }
+        err('NCM inválido. Use 8 dígitos no formato 0000.00.00.','ncm'); return s;
+      case 'cest':
+        if(/^\d{2}\.\d{3}\.\d{2}$/.test(s)) return s;
+        if(/^\d{7}$/.test(digits) && /^[\d.\s-]+$/.test(s)){ const o=s; s=digits.slice(0,2)+'.'+digits.slice(2,5)+'.'+digits.slice(5); adj('CEST formatado com pontos.',o,'cestfmt'); return s; }
+        if(/^\d{6}$/.test(digits) && typeof src==='number'){ const d='0'+digits; adj('CEST veio como número e perdeu o zero à esquerda; zero restaurado.',s,'cestzero'); return d.slice(0,2)+'.'+d.slice(2,5)+'.'+d.slice(5); }
+        err('CEST inválido. Use 7 dígitos no formato 00.000.00.','cest'); return s;
+      case 'nbs':
+        if(/^\d\.\d{4}\.\d{2}\.\d{2}$/.test(s)) return s;
+        if(/^\d{9}$/.test(digits) && /^[\d.\s-]+$/.test(s)){ const o=s; s=digits[0]+'.'+digits.slice(1,5)+'.'+digits.slice(5,7)+'.'+digits.slice(7); adj('NBS formatado com pontos.',o,'nbsfmt'); return s; }
+        err('NBS inválido. Use 9 dígitos no formato 0.0000.00.00.','nbs'); return s;
+      case 'cfop': case 'cfopvd': {
+        let out=s;
+        if(!/^\d\.\d{3}$/.test(s)){
+          if(/^\d{4}$/.test(digits) && /^[\d.\s]+$/.test(s)){ out=digits[0]+'.'+digits.slice(1); adj('CFOP formatado com ponto.',s,'cfopfmt'); }
+          else { err('CFOP inválido. Use 4 dígitos no formato 0.000.','cfop'); return s; }
+        }
+        const d0=out[0];
+        if(!'123567'.includes(d0)){ err('CFOP deve começar com 1, 2 ou 3 (entrada) ou 5, 6 ou 7 (saída).','cfopini'); return out; }
+        if(f.fmt==='cfopvd' && !'567'.includes(d0)) issue(line,f.n,'aviso','CFOP de venda normalmente começa com 5, 6 ou 7.',out,'cfopvd');
+        return out;
+      }
+      case 'icms': {
+        let v=s;
+        if(/^\d$/.test(v)){ v='0'+v; adj('Zero à esquerda completado.',s,'zero'); }
+        if(CST_ICMS.includes(v) || CSOSN.includes(v)) return v;
+        if(/^[0-8]\d\d$/.test(v) && CST_ICMS.includes(v.slice(1))) return v;
+        err('CST/CSOSN do ICMS inválido. Use um CST (00, 10, 20, 30, 40, 41, 50, 51, 60, 70, 90...), CST com origem (ex.: 000) ou CSOSN (101, 102, 500, 900...).','icms'); return v;
+      }
+      case 'pisS': case 'pisE': {
+        let v=s; if(/^\d$/.test(v)){ v='0'+v; adj('Zero à esquerda completado.',s,'zero'); }
+        if(!PIS_S.includes(v) && !PIS_E.includes(v)){ err('CST de PIS/COFINS inválido (válidos: 01 a 09, 49, 50 a 56, 60 a 67, 70 a 75, 98, 99).','pis'); return v; }
+        if(f.fmt==='pisS' && !PIS_S.includes(v)) issue(line,f.n,'aviso','CST de entrada (50 a 98) informado no campo de saída.',v,'pisdir');
+        if(f.fmt==='pisE' && !PIS_E.includes(v)) issue(line,f.n,'aviso','CST de saída (01 a 49) informado no campo de entrada.',v,'pisdir');
+        return v;
+      }
+      case 'ipiS': case 'ipiE': {
+        let v=s; if(/^\d$/.test(v)){ v='0'+v; adj('Zero à esquerda completado.',s,'zero'); }
+        const ok = f.fmt==='ipiS'?IPI_S:IPI_E;
+        if(!ok.includes(v)){
+          const other = f.fmt==='ipiS'?IPI_E:IPI_S;
+          err(other.includes(v) ? (f.fmt==='ipiS'?'CST de IPI de entrada no campo de saída. Na saída use 50 a 55 ou 99.':'CST de IPI de saída no campo de entrada. Na entrada use 00 a 05 ou 49.') : 'CST de IPI inválido (saída: 50 a 55, 99; entrada: 00 a 05, 49).','ipi');
+        }
+        return v;
+      }
+      case 'tipoitem': {
+        let v=s; if(/^\d$/.test(v)){ v='0'+v; adj('Zero à esquerda completado.',s,'zero'); }
+        if(!TIPOITEM.includes(v)) err('Tipo do item inválido. Use 00 a 10 ou 99 (ex.: 00 revenda, 01 matéria-prima, 04 produto acabado, 07 uso e consumo).','tipoitem');
+        return v;
+      }
+      case 'natrec': {
+        let v=s; if(/^\d{1,2}$/.test(v)){ v=v.padStart(3,'0'); adj('Zeros à esquerda completados.',s,'zero'); }
+        if(!/^\d{3}$/.test(v)) err('Natureza da receita deve ter 3 dígitos.','natrec');
+        return v;
+      }
+      case 'gtin': {
+        const ok = gtinOk(s);
+        if(ok===false) issue(line,f.n,'aviso','Dígito verificador do GTIN/EAN não confere.',s,'gtin');
+        return s;
+      }
+    }
+    return s;
+  }
+
+  function field(f, v, line, st, srcNumeric){
+    // vazio
+    if(v===undefined || v===null || (typeof v==='string' && v.trim()==='')){
+      if(f.t==='d' && opts.today){ bump(f.n); return fmtDate(todayObj()); }
+      if(defaults[f.n]!==undefined && defaults[f.n]!==''){ bump(f.n); v = defaults[f.n]; }
+      else { if(f.req){ issue(line,f.n,'erro','Campo obrigatório vazio.','', 'obrig'); st.err=true; } return ''; }
+    }
+    if(f.t==='n'){
+      const n = parseNum(v);
+      if(n===null) return '';
+      if(Number.isNaN(n)){ issue(line,f.n,'erro','Não é um número.',v,'num'); st.err=true; return String(v); }
+      if(f.min!==undefined && n<f.min){ issue(line,f.n,'erro',`Não pode ser menor que ${f.min}.`,v,'min'); st.err=true; }
+      let max=f.max;
+      if(f.n==='ALIQIPI' && st.tipoIPI!=='V') max=100;
+      if(max!==undefined && n>max){ issue(line,f.n,'erro',`Não pode ser maior que ${max}.`,v,'max'); st.err=true; }
+      if(f.int && !Number.isInteger(n)){ issue(line,f.n,'erro','Deve ser um número inteiro.',v,'int'); st.err=true; }
+      st.nums[f.n]=n;
+      return fmtNumBR(n);
+    }
+    if(f.t==='d'){
+      const d = parseDate(v);
+      if(!d || d.y<1900 || d.y>2100){ issue(line,f.n,'erro','Data inválida. Use dd/mm/aaaa.',v,'data'); st.err=true; return String(v); }
+      return fmtDate(d);
+    }
+    let s = cleanText(v, f, line, st);
+    if(s===''){ if(f.req){ issue(line,f.n,'erro','Campo obrigatório vazio.','','obrig'); st.err=true; } return ''; }
+    if(s.includes('|')){ issue(line,f.n,'erro','Contém o caractere | (barra vertical), que é o separador do TXT. Troque por outro caractere.',s,'pipe'); st.err=true; }
+    if(f.dom){
+      let u=s.toUpperCase();
+      if(f.dom===SN){ const map={SIM:'S',NAO:'N',TRUE:'S',FALSE:'N',VERDADEIRO:'S',FALSO:'N'}; const k=stripAcc(u); if(map[k]){ issue(line,f.n,'ajuste',`"${s}" convertido para ${map[k]}.`,s,'sn'); u=map[k]; } }
+      if(!f.dom.includes(u)){ issue(line,f.n,'erro',`Valor não aceito. Use ${f.dom.join(' ou ')}.`,s,'dom'); st.err=true; }
+      s=u;
+    }
+    if(f.fmt) s = fmtCheck(s, f, line, st, srcNumeric);
+    if(f.n==='CODIGO' && srcNumeric) issue(line,f.n,'aviso','O código veio como número do Excel; se ele tinha zeros à esquerda, eles se perderam. Formate a coluna como Texto.',s,'codnum');
+    if(opts.enc==='ansi'){ const bad=badAnsiChars(s); if(bad.length) issue(line,f.n,'aviso',`Caractere(s) ${bad.join(' ')} não existem em ANSI e sairão como "?".`,s,'ansi'); }
+    s = checkLen(s, f, line, st);
+    return s;
+  }
+  function bump(n){ res.defaultsApplied[n]=(res.defaultsApplied[n]||0)+1; }
+
+  function splitDesc(full, line, st){
+    const fd = PRODUTOS_FIELDS[2];
+    let s = cleanText(full, fd, line, st);
+    if(s.includes('|')){ issue(line,'DESCRICAO','erro','Contém o caractere | (barra vertical), que é o separador do TXT. Troque por outro caractere.',s,'pipe'); st.err=true; }
+    if(opts.enc==='ansi'){ const bad=badAnsiChars(s); if(bad.length) issue(line,'DESCRICAO','aviso',`Caractere(s) ${bad.join(' ')} não existem em ANSI e sairão como "?".`,s,'ansi'); }
+    if(s.length>100){
+      if(opts.truncate){ issue(line,'DESCRICAO','aviso',`Descrição com ${s.length} caracteres cortada para 100.`,s,'cortado'); s=s.slice(0,100); }
+      else { issue(line,'DESCRICAO','erro',`Descrição com ${s.length} caracteres; o máximo é 100 (50 da descrição + 50 do complemento).`,s,'desc100'); st.err=true; }
+    }
+    if(s.length<=50) return [s,''];
+    if(opts.wordBreak){
+      const cut = s.lastIndexOf(' ',50);
+      if(cut>0 && s.length-cut-1<=50) return [s.slice(0,cut).trimEnd(), s.slice(cut+1).trimStart()];
+    }
+    return [s.slice(0,50), s.slice(50,100)];
+  }
+
+  function row(src, line){
+    // src: {FIELD: value}, _num: Set de campos que vieram como número do Excel
+    res.total++;
+    const st = {err:false, nums:{}, tipoIPI:String(src.TIPOIPI??'').trim().toUpperCase()};
+    const out = new Array(fields.length);
+    for(let i=0;i<fields.length;i++){
+      const f=fields[i];
+      if(f.desc) continue;
+      out[i] = field(f, src[f.n], line, st, src._num && src._num.has(f.n));
+    }
+    // descrição
+    const full = src[table.descFull];
+    if(full!==undefined && full!==null && String(full).trim()!==''){
+      const [a,b] = splitDesc(full,line,st); out[2]=a; out[3]=b;
+    } else {
+      out[2] = field(fields[2], src.DESCRICAO, line, st);
+      out[3] = field(fields[3], src.COMPLEMENTO, line, st);
+    }
+    // regras entre campos
+    const n=st.nums;
+    if(n.PESOBRUTO!==undefined && n.PESOLIQUIDO!==undefined && n.PESOBRUTO < n.PESOLIQUIDO) issue(line,'PESOBRUTO','aviso','Peso bruto menor que o peso líquido.',fmtNumBR(n.PESOBRUTO),'peso');
+    if(out[5] && out[6] && out[5]!==out[6] && !(n.CONVERTE>0)) issue(line,'CONVERTE','aviso',`Unidades diferentes (${out[5]} e ${out[6]}) sem taxa de conversão.`,'','conv');
+    if(n.CONVERTE===0) issue(line,'CONVERTE','aviso','Taxa de conversão igual a zero.','0','conv0');
+    // chave primária
+    const pk = out[0]+'\u0001'+out[1];
+    if(out[0] && out[1]){
+      if(seenPK.has(pk)){ issue(line,'CODIGO','erro',`Código repetido para a empresa ${out[0]} (já aparece na linha ${seenPK.get(pk)}).`,out[1],'pk'); st.err=true; }
+      else seenPK.set(pk,line);
+    }
+    const bi = fields.findIndex(f=>f.uniq);
+    if(bi>=0 && out[bi]){
+      const k=out[0]+'\u0001'+out[bi];
+      if(seenBar.has(k)){ issue(line,'CODBAR','erro',`Código de barras repetido (já aparece na linha ${seenBar.get(k)}).`,out[bi],'codbar'); st.err=true; }
+      else seenBar.set(k,line);
+    }
+    out[1] = out[1].padStart(13,' ');
+    const txt = out.join('|')+'|';
+    res.lines.push({line, txt, err:st.err});
+    if(st.err) res.bad++; else res.ok++;
+  }
+  return {row, res, fields};
+}
+const GROUP_MSG = {
+  obrig:'Campo obrigatório vazio', tamanho:'Texto maior que o tamanho do campo', cortado:'Texto cortado no tamanho do campo',
+  num:'Valor não numérico', min:'Valor abaixo do mínimo', max:'Valor acima do máximo', int:'Deveria ser número inteiro',
+  data:'Data inválida', pipe:'Contém o separador |', dom:'Valor fora da lista aceita', sn:'SIM/NÃO convertido para S/N',
+  ncm:'NCM inválido', ncmfmt:'NCM formatado com pontos', ncmzero:'NCM com zero à esquerda restaurado',
+  cest:'CEST inválido', cestfmt:'CEST formatado com pontos', cestzero:'CEST com zero à esquerda restaurado',
+  nbs:'NBS inválido', nbsfmt:'NBS formatado com pontos', cfop:'CFOP inválido', cfopfmt:'CFOP formatado com ponto', cfopini:'CFOP com 1º dígito inválido', cfopvd:'CFOP de venda fora de 5, 6 ou 7',
+  icms:'CST/CSOSN de ICMS inválido', pis:'CST de PIS/COFINS inválido', pisdir:'CST de PIS/COFINS no sentido trocado', ipi:'CST de IPI inválido ou no sentido trocado',
+  tipoitem:'Tipo do item inválido', natrec:'Natureza da receita inválida', zero:'Zero à esquerda completado', gtin:'GTIN/EAN com dígito verificador errado',
+  codnum:'Código veio como número (zeros à esquerda podem ter sido perdidos)', ansi:'Caractere que não existe em ANSI', quebra:'Quebra de linha trocada por espaço',
+  desc100:'Descrição com mais de 100 caracteres', peso:'Peso bruto menor que o líquido', conv:'Unidades diferentes sem taxa de conversão', conv0:'Taxa de conversão zero',
+  pk:'Código de produto repetido', codbar:'Código de barras repetido',
+};
+
+// ====================================================================
+// Leitura de arquivos
+// ====================================================================
+function headerMap(table, cells){
+  // cells: array de [colIdx, texto]
+  const names = new Map();
+  for(const f of table.fields.concat(table.extra)) names.set(normHead(f.n), f.n);
+  const map=[]; let hits=0; const ignored=[];
+  for(const [ci, raw] of cells){
+    if(raw===null || raw===undefined || String(raw).trim()==='') continue;
+    const t = String(raw).trim();
+    const up = t.toUpperCase();
+    let fname=null;
+    if(up==='DESCRIÇÃO' || ['DESCRICAOCOMPLETA','DESCRICAOPRODUTO','DESCRICAODOPRODUTO'].includes(normHead(t))) fname=table.descFull;
+    else fname = names.get(normHead(t)) || null;
+    if(fname){ map.push([ci,fname]); hits++; } else ignored.push([ci,t]);
+  }
+  return {map,hits,ignored};
+}
+
+function xmlUnesc(s){
+  if(s.indexOf('&')<0 && s.indexOf('_x')<0) return s;
+  return s.replace(/_x([0-9A-Fa-f]{4})_/g,(m,h)=>String.fromCharCode(parseInt(h,16)))
+    .replace(/&(#x[0-9a-fA-F]+|#\d+|lt|gt|amp|quot|apos);/g,(m,e)=>{
+      if(e[0]==='#') return String.fromCodePoint(e[1]==='x'?parseInt(e.slice(2),16):parseInt(e.slice(1),10));
+      return {lt:'<',gt:'>',amp:'&',quot:'"',apos:"'"}[e];
+    });
+}
+
+// --- zip (lê apenas o necessário, em streaming) ---
+async function zipEntries(file){
+  const tailLen=Math.min(file.size, 65557);
+  const tb=new DataView(await file.slice(file.size-tailLen).arrayBuffer());
+  let e=-1; for(let i=tailLen-22;i>=0;i--){ if(tb.getUint32(i,true)===0x06054b50){e=i;break;} }
+  if(e<0) throw new Error('O arquivo não é um .xlsx válido (estrutura zip não encontrada).');
+  let n=tb.getUint16(e+10,true), cdSize=tb.getUint32(e+12,true), cdOff=tb.getUint32(e+16,true);
+  if(cdOff===0xFFFFFFFF && e>=20 && tb.getUint32(e-20,true)===0x07064b50){
+    const off64 = Number(tb.getBigUint64(e-20+8,true));
+    const z=new DataView(await file.slice(off64, off64+56).arrayBuffer());
+    n=Number(z.getBigUint64(32,true)); cdSize=Number(z.getBigUint64(40,true)); cdOff=Number(z.getBigUint64(48,true));
+  }
+  const cd=new DataView(await file.slice(cdOff, cdOff+cdSize).arrayBuffer());
+  const dec=new TextDecoder(); const out={}; let p=0;
+  for(let k=0;k<n && p+46<=cd.byteLength;k++){
+    if(cd.getUint32(p,true)!==0x02014b50) break;
+    const method=cd.getUint16(p+10,true); let comp=cd.getUint32(p+20,true), unc=cd.getUint32(p+24,true);
+    const nl=cd.getUint16(p+28,true), el=cd.getUint16(p+30,true), cl=cd.getUint16(p+32,true); let off=cd.getUint32(p+42,true);
+    const name=dec.decode(new Uint8Array(cd.buffer, cd.byteOffset+p+46, nl));
+    if(comp===0xFFFFFFFF||unc===0xFFFFFFFF||off===0xFFFFFFFF){
+      let q=p+46+nl; const end=q+el;
+      while(q+4<=end){ const id=cd.getUint16(q,true), sz=cd.getUint16(q+2,true); if(id===1){ let r=q+4; if(unc===0xFFFFFFFF){unc=Number(cd.getBigUint64(r,true));r+=8;} if(comp===0xFFFFFFFF){comp=Number(cd.getBigUint64(r,true));r+=8;} if(off===0xFFFFFFFF){off=Number(cd.getBigUint64(r,true));} } q+=4+sz; }
+    }
+    out[name]={name,method,comp,unc,off};
+    p+=46+nl+el+cl;
+  }
+  return out;
+}
+async function zipStream(file, ent, onBytes){
+  const lh=new DataView(await file.slice(ent.off, ent.off+30).arrayBuffer());
+  const start=ent.off+30+lh.getUint16(26,true)+lh.getUint16(28,true);
+  let s=file.slice(start, start+ent.comp).stream();
+  if(onBytes){ s = s.pipeThrough(new TransformStream({transform(c,ctl){ onBytes(c.byteLength); ctl.enqueue(c);} })); }
+  if(ent.method===8) s=s.pipeThrough(new DecompressionStream('deflate-raw'));
+  else if(ent.method!==0) throw new Error('Compressão do .xlsx não suportada.');
+  return s.pipeThrough(new TextDecoderStream('utf-8'));
+}
+async function zipText(file, ent){
+  const r=(await zipStream(file,ent)).getReader(); let out='';
+  for(;;){ const {done,value}=await r.read(); if(done) break; out+=value; }
+  return out;
+}
+function relTarget(base, t){
+  if(t.startsWith('/')) return t.slice(1);
+  const parts=base.split('/'); parts.pop();
+  for(const seg of t.split('/')){ if(seg==='..') parts.pop(); else if(seg!=='.') parts.push(seg); }
+  return parts.join('/');
+}
+
+// Lê .xlsx em streaming e chama onRow(rowNumber, cellsArray[[col,val,isNum]])
+async function readXlsx(file, onRow, onProgress, wantSheet){
+  const ents = await zipEntries(file);
+  const get = n => ents[n] || ents[Object.keys(ents).find(k=>k.toLowerCase()===n.toLowerCase())];
+  let wbPath='xl/workbook.xml';
+  if(get('_rels/.rels')){ const rr=await zipText(file,get('_rels/.rels')); const m=rr.match(/<Relationship[^>]*Type="[^"]*officeDocument"[^>]*>/); if(m){ const t=m[0].match(/Target="([^"]+)"/); if(t) wbPath=relTarget('',t[1]); } }
+  if(!get(wbPath)) throw new Error('Não encontrei a pasta de trabalho dentro do .xlsx.');
+  const wb = await zipText(file,get(wbPath));
+  const relsPath = wbPath.replace(/[^/]+$/,'_rels/')+wbPath.split('/').pop()+'.rels';
+  const rels = get(relsPath) ? await zipText(file,get(relsPath)) : '';
+  const relMap={}; for(const m of rels.matchAll(/<Relationship\b[^>]*>/g)){ const id=m[0].match(/Id="([^"]+)"/), t=m[0].match(/Target="([^"]+)"/); if(id&&t) relMap[id[1]]=relTarget(wbPath,t[1]); }
+  const sheets=[]; for(const m of wb.matchAll(/<sheet\b[^>]*>/g)){ const nm=m[0].match(/name="([^"]*)"/), rid=m[0].match(/r:id="([^"]+)"/)||m[0].match(/\bid="([^"]+)"/); if(nm&&rid) sheets.push({name:xmlUnesc(nm[1]), path:relMap[rid[1]]}); }
+  if(!sheets.length) throw new Error('A planilha não tem abas.');
+  let sh = sheets.find(s=>normHead(s.name)===normHead(wantSheet)) || sheets[0];
+  const sstEnt = Object.values(ents).find(e=>/sharedstrings\.xml$/i.test(e.name));
+  let sst=[];
+  if(sstEnt){
+    const x = await zipText(file,sstEnt);
+    for(const m of x.matchAll(/<si>([\s\S]*?)<\/si>/g)){
+      const body=m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g,'');
+      let t=''; for(const tm of body.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)) t+=tm[1];
+      sst.push(xmlUnesc(t));
+    }
+  }
+  const ent=get(sh.path); if(!ent) throw new Error('Não encontrei os dados da aba '+sh.name+'.');
+  let read=0; const total=ent.comp;
+  const reader=(await zipStream(file,ent,b=>{read+=b;})).getReader();
+  const ROW=/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g;
+  const CELL=/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
+  let buf=''; let rowCounter=0; let stop=false; let lastTick=0;
+  const proc = chunk => {
+    ROW.lastIndex=0; let m;
+    while((m=ROW.exec(chunk))){
+      const ra=m[1]; const rm=ra.match(/\br="(\d+)"/); const rn = rm?+rm[1]:rowCounter+1; rowCounter=rn;
+      const body=m[2]; if(!body || (body.indexOf('<v>')<0 && body.indexOf('<is>')<0 && body.indexOf('<v ')<0)) continue;
+      const cells=[]; let ci=-1; CELL.lastIndex=0; let c;
+      while((c=CELL.exec(body))){
+        const a=c[1]; const rr=a.match(/\br="([A-Z]+)\d*"/); ci = rr?colIndex(rr[1]):ci+1;
+        const inner=c[2]; if(!inner) continue;
+        const tm=a.match(/\bt="(\w+)"/); const t=tm?tm[1]:'n';
+        let val=null, isNum=false;
+        if(t==='inlineStr'){ let s=''; for(const x of inner.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)) s+=x[1]; val=xmlUnesc(s); }
+        else { const vm=inner.match(/<v>([\s\S]*?)<\/v>/); if(!vm) continue; const v=vm[1];
+          if(t==='s') val=sst[+v]??''; else if(t==='str') val=xmlUnesc(v); else if(t==='b') val=v==='1'; else if(t==='e') val=xmlUnesc(v); else { val=parseFloat(v); isNum=true; } }
+        cells.push([ci,val,isNum]);
+      }
+      if(onRow(rn,cells)===false){ stop=true; return; }
+    }
+  };
+  for(;;){
+    const {done,value}=await reader.read();
+    if(done){ if(buf) proc(buf); break; }
+    buf+=value;
+    const k=buf.lastIndexOf('</row>');
+    if(k>=0){ proc(buf.slice(0,k+6)); buf=buf.slice(k+6); }
+    if(stop){ reader.cancel(); break; }
+    const now=Date.now(); if(onProgress && now-lastTick>120){ lastTick=now; onProgress(read/total); await new Promise(r=>setTimeout(r,0)); }
+  }
+  return {sheet:sh.name, sheets:sheets.map(s=>s.name)};
+}
+
+function parseDelimited(text){
+  const first = text.split(/\r?\n/,1)[0]||'';
+  const cnt = ch => first.split(ch).length-1;
+  const cands=[['\t',cnt('\t')],[';',cnt(';')],[',',cnt(',')],['|',cnt('|')]].sort((a,b)=>b[1]-a[1]);
+  const d=cands[0][1]>0?cands[0][0]:';';
+  const rows=[]; let row=[], f='', q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=ch; continue; }
+    if(ch==='"' && f===''){ q=true; continue; }
+    if(ch===d){ row.push(f); f=''; continue; }
+    if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&text[i+1]==='\n') i++; row.push(f); rows.push(row); row=[]; f=''; continue; }
+    f+=ch;
+  }
+  if(f!==''||row.length){ row.push(f); rows.push(row); }
+  return {rows, delim:d};
+}
+function decodeText(buf){
+  try{ return new TextDecoder('utf-8',{fatal:true}).decode(buf).replace(/^﻿/,''); }
+  catch(e){ return new TextDecoder('windows-1252').decode(buf); }
+}
+
+// Coletor comum: detecta cabeçalho e transforma células em registros
+function makeCollector(table){
+  const st={header:null, map:null, ignored:[], rows:[], headerRow:0, skipped:0, blank:0, scanned:0};
+  const allNames = new Set(table.fields.concat(table.extra).map(f=>f.n)); allNames.add(table.descFull);
+  const defaultOnly = new Set(Object.keys(table.defaults));
+  const lens = new Map(table.fields.map(f=>[f.n,f.len]));
+  function onRow(rn, cells){
+    st.scanned++;
+    if(!st.map){
+      const h=headerMap(table, cells.map(c=>[c[0],c[1]]));
+      // cabeçalho = linha em que a maioria das células são nomes de campo
+      if(h.hits>=3 && h.hits >= 0.5*(h.hits+h.ignored.length)){ st.map=new Map(h.map); st.ignored=h.ignored; st.headerRow=rn; st.mapped=h.map; }
+      else if(st.scanned>60) return false;
+      return;
+    }
+    const rec={}; let any=false; const nums=new Set();
+    for(const [ci,val,isNum] of cells){
+      const fn=st.map.get(ci); if(!fn) continue;
+      if(val===null||val===undefined||(typeof val==='string'&&val.trim()==='')) continue;
+      rec[fn]=val; if(isNum) nums.add(fn);
+      if(!defaultOnly.has(fn)) any=true;
+    }
+    if(!any){ st.blank++; return; }
+    // linha de tamanhos do modelo antigo (8, 13, 50, ...)
+    if(rn-st.headerRow<=3 && rec.ABREV===8 && rec.CODIGO===13){ st.skipped++; return; }
+    if(nums.size) rec._num=nums;
+    st.rows.push({line:rn, rec});
+  }
+  return {st,onRow};
+}
+
+// TXT já gerado (layout pipe)
+function txtToRows(table, text){
+  const rows=[]; const lines=text.split(/\r?\n/);
+  const base=table.fields.length, ext=base+table.extra.length;
+  let n=0;
+  for(let i=0;i<lines.length;i++){
+    const L=lines[i]; if(!L.trim()) continue;
+    let p=L.split('|'); if(p[p.length-1]==='') p.pop();
+    const fields = p.length>base ? table.fields.concat(table.extra) : table.fields;
+    const rec={};
+    if(p.length!==base && p.length!==ext) rec._count=p.length;
+    fields.forEach((f,j)=>{ const v=p[j]; if(v!==undefined && v.trim()!=='') rec[f.n]=f.n==='CODIGO'?v.trim():v; });
+    rows.push({line:i+1, rec}); n++;
+  }
+  return rows;
+}
+/*CORE-END*/
+</script>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const table = () => TABLES[$('tabela').value];
+let state = { rows:[], meta:null, res:null, isExample:false, source:'' };
+const OPTS_KEY='importador-txt-opts-v1';
+
+// ---------- opções (lembradas neste navegador) ----------
+function loadOpts(){ try{ return JSON.parse(localStorage.getItem(OPTS_KEY)||'{}'); }catch(e){ return {}; } }
+function saveOpts(){ try{ localStorage.setItem(OPTS_KEY, JSON.stringify(readOpts(true))); }catch(e){} }
+function readOpts(raw){
+  const defs={}; document.querySelectorAll('#defs input').forEach(i=>defs[i.dataset.f]=i.value.trim());
+  return { enc:$('enc').value, today:$('optHoje').checked, wordBreak:$('optPalavra').checked, upper:$('optUpper').checked, noAccents:$('optAcento').checked, truncate:$('optTrunc').checked, extra:$('optExtra').checked, defaults:defs };
+}
+function initOpts(){
+  const o=loadOpts(); const t=table();
+  if(o.enc) $('enc').value=o.enc;
+  for(const [id,k] of [['optHoje','today'],['optPalavra','wordBreak'],['optUpper','upper'],['optAcento','noAccents'],['optTrunc','truncate'],['optExtra','extra']]) if(typeof o[k]==='boolean') $(id).checked=o[k];
+  const box=$('defs'); box.innerHTML='';
+  for(const [f,v] of Object.entries(t.defaults)){
+    const fd=t.fields.find(x=>x.n===f);
+    const l=document.createElement('label'); l.htmlFor='def_'+f; l.innerHTML=`<span class="mono">${f}</span> <span class="muted">${esc(fd?fd.l:'')}</span>`;
+    const i=document.createElement('input'); i.type='text'; i.id='def_'+f; i.dataset.f=f; i.value=(o.defaults&&o.defaults[f]!==undefined)?o.defaults[f]:v; i.maxLength=fd&&fd.len||10;
+    box.append(l,i);
+  }
+}
+
+// ---------- tabela ----------
+function initTables(){
+  const sel=$('tabela');
+  for(const t of Object.values(TABLES)){ const o=document.createElement('option'); o.value=t.id; o.textContent=`${t.nome} · ${t.titulo}`; sel.append(o); }
+  sel.addEventListener('change',()=>{ initOpts(); renderLayout(); runExample(); });
+}
+function ruleText(f){
+  if(f.desc) return f.n==='DESCRICAO'?'Preenchido a partir da descrição completa (até 100 caracteres): primeiros 50.':'Caracteres 51 a 100 da descrição completa.';
+  if(f.t==='n') return 'Número. Aceita 9,75 ou 9.75'+(f.min===0?'; não negativo':'')+(f.max?`; até ${f.max}`:'')+(f.int?'; inteiro':'')+'.';
+  if(f.t==='d') return 'Data dd/mm/aaaa (ou data do Excel).';
+  if(f.dom) return f.dom.join(' ou ')+(f.dom===SN?' (aceita SIM/NÃO)':'');
+  const m={ncm:'0000.00.00 (aceita 8 dígitos sem ponto)',cest:'00.000.00 (aceita 7 dígitos)',nbs:'0.0000.00.00 (aceita 9 dígitos)',cfop:'0.000; começa com 1, 2, 3, 5, 6 ou 7',cfopvd:'0.000; normalmente 5, 6 ou 7',
+    icms:'CST (00, 10, 20, 40, 60, 90…), CST com origem (000) ou CSOSN (101, 102, 500…)',pisS:'01 a 09, 49 ou 99',pisE:'50 a 56, 60 a 67, 70 a 75, 98 ou 99',ipiS:'50 a 55 ou 99',ipiE:'00 a 05 ou 49',
+    tipoitem:'00 a 10 ou 99',natrec:'3 dígitos',gtin:'Confere o dígito do GTIN/EAN; não pode repetir'};
+  let s = `Texto até ${f.len}`+(f.fmt?'. '+m[f.fmt]:'')+(f.n==='CODIGO'?'. Não pode repetir na mesma empresa; sai alinhado à direita':'');
+  if(f.up) s+='. Sai em maiúsculas';
+  return s+'.';
+}
+function renderLayout(){
+  const t=table(); const fl=t.fields.concat(t.extra);
+  $('tabelaInfo').textContent=t.info;
+  $('cLay').textContent=t.fields.length;
+  $('tbLay').innerHTML = fl.map((f,i)=>{
+    const def=t.defaults[f.n]?` Vazio = ${t.defaults[f.n]}.`:'';
+    const desc=f.semDesc?'<span class="muted">sem descrição no modelo atual</span>':esc(f.l);
+    return `<tr><td class="num">${f.extra?'+'+(i-t.fields.length+1):i+1}</td><td><code class="fn">${f.n}</code>${f.extra?' <span class="sev ajuste">novo</span>':''}</td><td>${desc}</td><td>${f.req?'Sim':''}</td><td class="mono" style="white-space:nowrap">${f.t==='n'?'número':f.t==='d'?'data':'texto '+(f.len||'')}</td><td>${esc(ruleText(f))}${esc(def)}${f.fmt==='tipoitem'?'<br><span class="muted">'+Object.entries(TIPOITEM_DESC).map(([k,v])=>k+' '+v).join(' · ')+'</span>':''}</td></tr>`;
+  }).join('');
+}
+
+// ---------- leitura ----------
+function showProg(on, txt, frac){ $('prog').hidden=!on; if(txt) $('progTxt').textContent=txt; if(frac!==undefined) $('progBar').style.width=Math.round(frac*100)+'%'; }
+function fail(msg){ $('falha').hidden=false; $('falha').innerHTML='<span><b>Não foi possível ler.</b> '+esc(msg)+'</span>'; showProg(false); }
+
+async function handleFile(file){
+  $('falha').hidden=true; $('copybox').hidden=true;
+  const t=table(); const name=file.name; const ext=(name.split('.').pop()||'').toLowerCase();
+  showProg(true,'Lendo '+name+'…',0);
+  try{
+    let rows, meta={arquivo:name};
+    if(ext==='xlsx'||ext==='xlsm'){
+      const col=makeCollector(t); const t0=performance.now();
+      const info=await readXlsx(file, col.onRow, f=>showProg(true,`Lendo ${name}… ${Math.round(f*100)}%`,f), t.nome);
+      if(!col.st.map) throw new Error(`Não encontrei a linha com os nomes dos campos (ABREV, CODIGO, DESCRICAO…) na aba "${info.sheet}". Use o modelo desta página ou o modelo atual.`);
+      rows=col.st.rows; Object.assign(meta,{aba:info.sheet, cab:col.st.headerRow, mapped:col.st.mapped, ignored:col.st.ignored, vazias:col.st.blank, ms:performance.now()-t0});
+    } else if(ext==='xls'||ext==='ods'){
+      showProg(true,'Carregando leitor de .'+ext+'…',.1);
+      await loadSheetJS();
+      const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
+      const wsName=wb.SheetNames.find(n=>normHead(n)===normHead(t.nome))||wb.SheetNames[0];
+      const ws=wb.Sheets[wsName]; const col=makeCollector(t);
+      const first=ws['!ref']?XLSX.utils.decode_range(ws['!ref']).s.r:0;
+      const data=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,blankrows:true});
+      for(let r=0;r<data.length;r++){ const row=data[r]; if(!row) continue; const cells=[]; row.forEach((v,ci)=>{ if(v!==null&&v!==undefined) cells.push([ci, v, typeof v==='number']); }); if(col.onRow(first+r+1,cells)===false) break; }
+      if(!col.st.map) throw new Error(`Não encontrei a linha com os nomes dos campos na aba "${wsName}".`);
+      rows=col.st.rows; Object.assign(meta,{aba:wsName, cab:col.st.headerRow, mapped:col.st.mapped, ignored:col.st.ignored, vazias:col.st.blank});
+    } else {
+      const text=decodeText(await file.arrayBuffer());
+      const r=fromText(t,text); rows=r.rows; Object.assign(meta,r.meta);
+    }
+    showProg(false);
+    load(rows, meta, false);
+  }catch(e){ console.error(e); fail(e.message||String(e)); }
+}
+function fromText(t, text){
+  const firstLine=(text.split(/\r?\n/).find(l=>l.trim())||'');
+  const pipes=firstLine.split('|').length-1;
+  const looksTxt = pipes>=t.fields.length-1 && !/ABREV/i.test(firstLine);
+  if(looksTxt){ return {rows:txtToRows(t,text), meta:{formato:'TXT no layout de importação'}}; }
+  const {rows:grid,delim}=parseDelimited(text);
+  const col=makeCollector(t);
+  grid.forEach((r,i)=>col.onRow(i+1, r.map((v,ci)=>[ci,v,false])));
+  if(!col.st.map) throw new Error('Não encontrei a linha com os nomes dos campos (ABREV, CODIGO, DESCRICAO…). Inclua o cabeçalho ao copiar ou exportar.');
+  return {rows:col.st.rows, meta:{formato:delim==='\t'?'dados colados':'CSV ('+delim+')', cab:col.st.headerRow, mapped:col.st.mapped, ignored:col.st.ignored, vazias:col.st.blank}};
+}
+
+function load(rows, meta, isExample){
+  state.rows=rows; state.meta=meta; state.isExample=isExample;
+  validate();
+}
+function validate(){
+  const t=table(); const o=readOpts();
+  const v=makeValidator(t,o);
+  for(const r of state.rows){ v.row(r.rec, r.line); if(r.rec._count) v.res.issues.push({line:r.line,field:'(linha)',sev:'erro',msg:`Linha com ${r.rec._count} campos; o layout tem ${t.fields.length}.`,val:'',gk:'x'}); }
+  state.res=v.res; state.fields=v.fields;
+  render();
+}
+
+// ---------- render ----------
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtInt = n => n.toLocaleString('pt-BR');
+let probLimit=300, groupFilter='';
+function render(){
+  const r=state.res, m=state.meta||{}, t=table();
+  $('exemplo').hidden=!state.isExample;
+  $('tLidas').textContent=fmtInt(r.total); $('tOk').textContent=fmtInt(r.ok); $('tErr').textContent=fmtInt(r.bad); $('tAviso').textContent=fmtInt(r.counts.aviso);
+  const pill=$('stPill');
+  if(!r.total){ pill.className='pill warn'; pill.textContent='NENHUMA LINHA'; }
+  else if(r.bad){ pill.className='pill err'; pill.textContent=`${fmtInt(r.bad)} COM ERRO`; }
+  else { pill.className='pill ok'; pill.textContent='PRONTO PARA GERAR'; }
+  $('stTitulo').textContent = state.isExample ? 'Resultado do exemplo' : (m.arquivo||'Dados colados');
+  const parts=[];
+  if(m.aba) parts.push(`aba ${m.aba}`);
+  if(m.formato) parts.push(m.formato);
+  if(m.cab) parts.push(`cabeçalho na linha ${m.cab}`);
+  if(m.mapped){ const got=new Set(m.mapped.map(x=>x[1])); const miss=t.fields.filter(f=>!f.desc && !got.has(f.n)).map(f=>f.n); parts.push(`${m.mapped.length} colunas reconhecidas`+(miss.length?` (sem coluna: ${miss.length<=6?miss.join(', '):miss.length+' campos'})`:'')); }
+  if(m.ignored && m.ignored.length) parts.push('ignoradas: '+m.ignored.slice(0,6).map(x=>colLetter(x[0])+' ('+x[1].slice(0,18)+')').join(', ')+(m.ignored.length>6?'…':''));
+  if(m.vazias) parts.push(`${fmtInt(m.vazias)} linhas vazias puladas`);
+  const da=Object.entries(r.defaultsApplied); if(da.length) parts.push('padrões aplicados: '+da.map(([k,v])=>`${k} ×${fmtInt(v)}`).join(', '));
+  $('stMeta').textContent=parts.join(' · ');
+  $('btnTxt').disabled = !r.total || r.bad>0;
+  $('btnTxt').textContent = r.bad? 'Gerar TXT (corrija os erros)' : `Gerar TXT · ${fmtInt(r.ok)} linhas`;
+  $('btnTxtValidas').hidden = !(r.bad>0 && r.ok>0);
+  $('btnTxtValidas').textContent = `Gerar só com as ${fmtInt(r.ok)} linhas válidas`;
+  $('btnRelatorio').disabled = !r.issues.length;
+  $('cProb').textContent=fmtInt(r.issues.length);
+  // grupos
+  const order={erro:0,aviso:1,ajuste:2};
+  const groups=[...r.groups.values()].sort((a,b)=>order[a.sev]-order[b.sev]||b.count-a.count);
+  $('grupos').innerHTML = groups.length ? groups.slice(0,40).map(g=>`<button type="button" class="grp ${g.sev}" data-gk="${esc(g.key)}" aria-pressed="${groupFilter===g.key}"><span class="sev ${g.sev}">${g.sev}</span><span class="m"><span class="f">${g.field}</span> · ${esc(g.msg)}</span><span class="k tabnum">${fmtInt(g.count)}×</span></button>`).join('')
+    : (r.total?'<div class="empty">Nenhum problema encontrado. O TXT está pronto.</div>':'<div class="empty">Nenhuma linha com dados foi encontrada.</div>');
+  const fc=$('fCampo'); const cur=fc.value; const fieldsWith=[...new Set(r.issues.map(i=>i.field))].sort();
+  fc.innerHTML='<option value="">Todos os campos</option>'+fieldsWith.map(f=>`<option ${f===cur?'selected':''}>${f}</option>`).join('');
+  probLimit=300; renderProblems(); renderPreview();
+}
+function filteredIssues(){
+  const sev=$('fSev').value, fld=$('fCampo').value, q=$('fBusca').value.trim().toLowerCase();
+  return state.res.issues.filter(i=>(!groupFilter||i.gk===groupFilter)&&(!sev||i.sev===sev)&&(!fld||i.field===fld)&&(!q||String(i.line)===q||i.val.toLowerCase().includes(q)||i.msg.toLowerCase().includes(q)));
+}
+function renderProblems(){
+  const list=filteredIssues();
+  const shown=list.slice(0,probLimit);
+  $('tbProb').innerHTML = shown.length ? shown.map(i=>`<tr><td class="num">${i.line}</td><td><span class="sev ${i.sev}">${i.sev}</span></td><td><code class="fn">${i.field}</code></td><td>${i.val?`<code>${esc(i.val.length>70?i.val.slice(0,70)+'…':i.val)}</code>`:'<span class="muted">vazio</span>'}</td><td>${esc(i.msg)}</td></tr>`).join('')
+    : `<tr><td colspan="5" class="empty">${state.res.issues.length?'Nada com esse filtro.':'Sem problemas.'}</td></tr>`;
+  $('fInfo').textContent = list.length? `${fmtInt(Math.min(probLimit,list.length))} de ${fmtInt(list.length)}`+(state.res.dropped?` (lista limitada a ${fmtInt(state.res.maxIssues)})`:'') : '';
+  $('btnMais').hidden = list.length<=probLimit;
+}
+function renderPreview(){
+  const L=state.res.lines; const n=Math.min(L.length,200);
+  const fl=state.fields.length;
+  $('prevInfo').textContent = L.length ? `Mostrando ${fmtInt(n)} de ${fmtInt(L.length)} linhas · ${fl} campos por linha · codificação ${$('enc').value==='ansi'?'ANSI (Windows-1252)':'UTF-8'} · fim de linha CRLF. Linhas com erro aparecem marcadas e não entram no arquivo.` : 'Nada para mostrar.';
+  $('prev').innerHTML = L.slice(0,n).map(l=>`<span class="${l.err?'bad':''}"><span class="ln">${l.line}</span>${esc(l.txt).replace(/\|/g,'<span class="p">|</span>')}</span>`).join('\n');
+}
+
+// ---------- geração ----------
+function buildTxt(onlyValid){
+  const lines=state.res.lines.filter(l=>!onlyValid||!l.err).map(l=>l.txt);
+  const text=lines.join('\r\n')+'\r\n';
+  const bytes = $('enc').value==='ansi' ? encode1252(text) : new TextEncoder().encode(text);
+  return {text,bytes,count:lines.length};
+}
+function stamp(){ const d=new Date(); return d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+'_'+pad2(d.getHours())+pad2(d.getMinutes()); }
+const downloadsP = (window.claude && typeof window.claude.use==='function') ? window.claude.use('downloads').catch(()=>null) : Promise.resolve(undefined);
+async function saveFile(filename, bytes, textFallback){
+  const dl = await downloadsP;
+  if(dl===undefined){ // fora do Claude: download normal
+    const url=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'}));
+    const a=document.createElement('a'); a.href=url; a.download=filename; document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
+    toast('Arquivo gerado: '+filename); return;
+  }
+  if(!dl){ $('copyArea').value=textFallback; $('copybox').hidden=false; return; }
+  try{ await dl.save({filename, data:new Blob([bytes])}); toast('Arquivo salvo: '+filename); }
+  catch(e){ if(e&&e.code==='declined') toast('Download cancelado.'); else if(e&&e.code==='rate_limited') toast('Já existe um download aguardando confirmação.'); else { $('copyArea').value=textFallback; $('copybox').hidden=false; } }
+}
+async function genTxt(onlyValid){
+  const {text,bytes,count}=buildTxt(onlyValid);
+  await saveFile(`${table().nome}_${stamp()}${onlyValid?'_validas':''}.txt`, bytes, text);
+  if(count) {}
+}
+async function genReport(){
+  const head='Linha;Tipo;Campo;Valor;Mensagem';
+  const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+  const body=state.res.issues.map(i=>[i.line,i.sev,i.field,q(i.val),q(i.msg)].join(';'));
+  const text='﻿'+[head,...body].join('\r\n')+'\r\n';
+  await saveFile(`${table().nome}_problemas_${stamp()}.csv`, new TextEncoder().encode(text), text);
+}
+
+// ---------- modelo .xlsx ----------
+let sheetjsP=null;
+function loadSheetJS(){
+  if(window.XLSX) return Promise.resolve();
+  return sheetjsP ||= new Promise((ok,ko)=>{ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload=ok; s.onerror=()=>{sheetjsP=null;ko(new Error('Não foi possível carregar o gerador de planilhas.'));}; document.head.append(s); });
+}
+async function genModelo(){
+  try{
+    toast('Montando o modelo…'); await loadSheetJS();
+    const t=table();
+    const cols=[]; for(const f of t.fields){ if(f.n==='DESCRICAO'){ cols.push({n:t.descFull,l:'Descrição completa do produto (até 100 caracteres)',req:1}); continue; } if(f.n==='COMPLEMENTO') continue; cols.push(f); }
+    const labels=cols.map(f=>(f.req?'* ':'')+(f.semDesc?f.n:f.l));
+    const names=cols.map(f=>f.n);
+    const ws=XLSX.utils.aoa_to_sheet([labels,names]);
+    ws['!cols']=cols.map(f=>({wch:Math.max(12,Math.min(40,(f.l||'').length))}));
+    ws['!freeze']={xSplit:0,ySplit:2};
+    const instr=[['Campo','Descrição','Obrigatório','Tipo','Regra','Padrão quando vazio']];
+    for(const f of cols){ instr.push([f.n, f.semDesc?'':f.l, f.req?'Sim':'', f.t==='n'?'Número':f.t==='d'?'Data':'Texto '+(f.len||100), f.n===t.descFull?'Até 100 caracteres. Os primeiros 50 vão para DESCRICAO e o resto para COMPLEMENTO.':ruleText(f), t.defaults[f.n]||(f.t==='d'?'Data de hoje':'')]); }
+    instr.push([]); instr.push(['Como preencher']);
+    instr.push(['1','Preencha a aba PRODUTOS a partir da linha 3. Não apague as linhas 1 e 2.']);
+    instr.push(['2','Campos com * são obrigatórios. Formate como Texto as colunas de código que têm zeros à esquerda (CODIGO, CSTs, TIPOITEM).']);
+    instr.push(['3','Não use o caractere | em nenhum campo.']);
+    instr.push(['4','Envie a planilha no Importador de Cadastros TXT para validar e gerar o arquivo.']);
+    instr.push([]); instr.push(['Tipo do item (TIPOITEM)']); for(const [k,v] of Object.entries(TIPOITEM_DESC)) instr.push([k,v]);
+    const wi=XLSX.utils.aoa_to_sheet(instr); wi['!cols']=[{wch:24},{wch:46},{wch:12},{wch:12},{wch:70},{wch:18}];
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,t.nome); XLSX.utils.book_append_sheet(wb,wi,'INSTRUCOES');
+    const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+    await saveFile(`MODELO_${t.nome}.xlsx`, new Uint8Array(out), 'O modelo .xlsx não pode ser copiado como texto. Abra esta página no navegador para baixar.');
+  }catch(e){ toast(e.message||String(e)); }
+}
+
+// ---------- exemplo ----------
+const EXEMPLO = [
+ 'ABREV;CODIGO;DESCRICAO_COMPLETA;NUMFABRICANTE;UNIMED;UNIMEDFAT;CONVERTE;ALIQICMS;ALIQIPI;INCFISCAL;CODTRIBUTACAO;CLASFISCAL;DATACADASTRO;REFERALT;BLOQUEIA;CREDITOPIS;TIPOIPI;CREDITOCOFINS;ORIGEM;FERRAMENTA;LOTEECONOMICO;CODLOCALARM;TIPOCOMPRA;CONTROLESERIE;CSTPIS;CSTCOFINS;INSPSCQ;CODBAR;CEST;CODTRIBUTACAOENTRADA',
+ 'EMPR;0001;PARAFUSO SEXTAVADO ACO INOX M8 X 30 MM ROSCA TOTAL - CAIXA COM 100 UNIDADES;PSX-830;CX;CX;1;18;9,75;0;00;7318.15.00;02/09/2026;REF-0001;N;N;P;N;C;N;1;DVDA;CO;N;01;01;N;7891234567895;;00',
+ 'EMPR;0002;ARRUELA LISA ACO ZINCADO 8 MM;ARL-08;PC;CX;;18;0;0;00;73182200;02/09/2026;REF-0002;N;N;P;N;C;N;1;DVDA;CO;N;1;1;N;;;00',
+ 'EMPR;0003;OLEO LUBRIFICANTE MULTIUSO 300 ML;OL-300;UN;UN;1;18;0;0;60;2710.19.31;03/09/2026;REF-0003;N;N;P;N;C;N;1;DVDA;CO;N;01;01;N;7891234567890;06.001.00;60',
+ 'EMPR;0001;PORCA SEXTAVADA M8;PS-08;UN;UN;1;18;0;0;00;7318.16.00;03/09/2026;;N;N;P;N;C;N;1;DVDA;CO;N;01;01;N;;;00',
+ 'EMPR;0005;CHAVE COMBINADA 13 MM | CROMO VANADIO;CC-13;;UN;1;18;0;0;00;8204.11.00;04/09/2026;;N;N;P;N;X;SIM;1;DVDA;CO;N;01;01;N;;;00',
+ 'EMPR;0006;FITA ISOLANTE 19 MM X 20 M;FI-1920;RL;RL;1;118;0;0;00;3919.10;04/09/2026;;N;N;P;N;C;N;1;DVDA;CO;N;01;01;N;;;00',
+ 'EMPR;0007;LUVA DE PROTECAO NITRILICA TAMANHO G;LV-NG;PR;PR;1;18;0;0;00;4015.19.00;31/02/2026;;N;N;P;N;C;N;1;DVDA;CO;N;01;01;N;;;00',
+].join('\n');
+function runExample(){
+  try{ const r=fromText(table(),EXEMPLO); load(r.rows,{formato:'exemplo'},true); }catch(e){ console.error(e); }
+}
+
+// ---------- eventos ----------
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,3200); }
+function setTab(which){
+  for(const [b,p] of [['tabProb','pProb'],['tabPrev','pPrev'],['tabLay','pLay']]){ const on=b===which; $(b).setAttribute('aria-selected',on); $(p).hidden=!on; }
+}
+function wire(){
+  $('arquivo').addEventListener('change',e=>{ const f=e.target.files[0]; if(f) handleFile(f); e.target.value=''; });
+  const d=$('drop');
+  ['dragenter','dragover'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault(); d.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault(); d.classList.remove('over');}));
+  d.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) handleFile(f); });
+  $('modoArquivo').onclick=()=>{ $('modoArquivo').setAttribute('aria-pressed','true'); $('modoColar').setAttribute('aria-pressed','false'); $('boxArquivo').hidden=false; $('boxColar').hidden=true; };
+  $('modoColar').onclick=()=>{ $('modoColar').setAttribute('aria-pressed','true'); $('modoArquivo').setAttribute('aria-pressed','false'); $('boxArquivo').hidden=true; $('boxColar').hidden=false; $('colado').focus(); };
+  $('btnColar').onclick=()=>{ $('falha').hidden=true; const txt=$('colado').value; if(!txt.trim()){ toast('Cole os dados primeiro.'); return; } try{ const r=fromText(table(),txt); load(r.rows,r.meta,false); }catch(e){ fail(e.message); } };
+  $('btnTxt').onclick=()=>genTxt(false);
+  $('btnTxtValidas').onclick=()=>genTxt(true);
+  $('btnRelatorio').onclick=genReport;
+  $('btnModelo').onclick=genModelo;
+  $('btnLayout').onclick=()=>{ setTab('tabLay'); $('pLay').scrollIntoView({behavior:'smooth',block:'start'}); };
+  $('tabProb').onclick=()=>setTab('tabProb'); $('tabPrev').onclick=()=>setTab('tabPrev'); $('tabLay').onclick=()=>setTab('tabLay');
+  $('grupos').addEventListener('click',e=>{ const b=e.target.closest('.grp'); if(!b) return; groupFilter = groupFilter===b.dataset.gk?'':b.dataset.gk; document.querySelectorAll('.grp').forEach(x=>x.setAttribute('aria-pressed',x.dataset.gk===groupFilter)); probLimit=300; renderProblems(); });
+  ['fSev','fCampo'].forEach(id=>$(id).addEventListener('change',()=>{probLimit=300;renderProblems();}));
+  $('fBusca').addEventListener('input',()=>{probLimit=300;renderProblems();});
+  $('btnMais').onclick=()=>{ probLimit+=300; renderProblems(); };
+  const revalidate=()=>{ saveOpts(); groupFilter=''; if(state.rows) validate(); };
+  ['enc','optHoje','optPalavra','optUpper','optAcento','optTrunc','optExtra'].forEach(id=>$(id).addEventListener('change',revalidate));
+  $('defs').addEventListener('change',revalidate);
+  $('btnCopiar').onclick=async()=>{ const a=$('copyArea'); try{ await navigator.clipboard.writeText(a.value); toast('Copiado.'); }catch(e){ a.focus(); a.select(); toast('Selecionado. Use Ctrl+C.'); } };
+  $('btnFecharCopia').onclick=()=>{ $('copybox').hidden=true; };
+}
+initTables(); initOpts(); renderLayout(); wire(); runExample();
+</script>
