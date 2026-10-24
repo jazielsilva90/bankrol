@@ -17,6 +17,9 @@ once('teamNotes=[...m.values()]}await save(true)}','teamNotes=[...m.values()];tr
 once('write(K.n,teamNotes);if(!user)return;','write(K.n,teamNotes);write(K.t,transactions);if(!user)return;','save local');
 once("settings:{mode:'analysis',teamNotes}","settings:{mode:'analysis',teamNotes,transactions}",'save nuvem');
 
+// O Auth do Supabase devolve o erro em "msg"; sem lê-lo, senha errada aparecia como "Falha na conexão".
+once("throw Error(d?.message||d?.error_description||d?.error||'Falha na conexão')","throw Error(d?.message||d?.msg||d?.error_description||d?.error||'Falha na conexão')",'mensagem de erro do login');
+
 // Navegação
 const navOld='<button data-page="notes">Anotações</button><button data-page="settings">Ajustes</button>';
 const navNew='<button data-page="bank">Banca</button><button data-page="notes">Anotações</button><button data-page="settings">Ajustes</button>';
