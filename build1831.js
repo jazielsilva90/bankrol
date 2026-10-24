@@ -10,15 +10,24 @@ once('Versão 1.8.30 — Corrige a ordem visual da Nova Análise para Valor Simu
 
 // Estado: movimentações ficam no localStorage e no mesmo registro da nuvem (settings.transactions),
 // sem alterar a tabela do Supabase. Exclusões usam deletedAt para não "ressuscitarem" no merge entre aparelhos.
-once("n:'bankrol.teamnotes.stable.v1'}","n:'bankrol.teamnotes.stable.v1',t:'bankrol.transactions.stable.v1'}",'chave local');
-once('teamNotes=[],notesEditing=null,','teamNotes=[],notesEditing=null,transactions=[],txEditing=null,bankFilter=\'all\',','estado');
+once("n:'bankrol.teamnotes.stable.v1'}","n:'bankrol.teamnotes.stable.v1',t:'bankrol.transactions.stable.v1',x:'bankrol.reset.stable.v1'}",'chave local');
+once('teamNotes=[],notesEditing=null,','teamNotes=[],notesEditing=null,transactions=[],txEditing=null,bankFilter=\'all\',resetAt=read(K.x,\'\'),','estado');
 once('teamNotes=read(K.n,[]);','teamNotes=read(K.n,[]);transactions=mergeTx(read(K.t,[]),[]);','hydrate local');
 once('teamNotes=[...m.values()]}await save(true)}','teamNotes=[...m.values()];transactions=mergeTx(Array.isArray(d[0].settings?.transactions)?d[0].settings.transactions:[],transactions)}await save(true)}','hydrate nuvem');
+// Reset: "Apagar todos os dados" grava settings.resetAt; outro aparelho com marca diferente descarta o que tem
+// no localStorage antes do merge, senão os dados apagados voltariam na próxima sincronização.
+once('if(d?.[0]){records=merge(d[0].simulations||[],records);',"if(d?.[0]){const remoteReset=d[0].settings?.resetAt||'';if(remoteReset&&remoteReset!==resetAt){records=[];teamNotes=[];transactions=[];resetAt=remoteReset;write(K.x,resetAt)}records=merge(d[0].simulations||[],records);",'hydrate reset');
 once('write(K.n,teamNotes);if(!user)return;','write(K.n,teamNotes);write(K.t,transactions);if(!user)return;','save local');
-once("settings:{mode:'analysis',teamNotes}","settings:{mode:'analysis',teamNotes,transactions}",'save nuvem');
+once("settings:{mode:'analysis',teamNotes}","settings:{mode:'analysis',teamNotes,transactions,resetAt}",'save nuvem');
 
 // O Auth do Supabase devolve o erro em "msg"; sem lê-lo, senha errada aparecia como "Falha na conexão".
 once("throw Error(d?.message||d?.error_description||d?.error||'Falha na conexão')","throw Error(d?.message||d?.msg||d?.error_description||d?.error||'Falha na conexão')",'mensagem de erro do login');
+
+// Ajustes: backup completo (o botão antigo falhava porque a constante URL do Supabase esconde window.URL)
+// e botão para apagar todos os dados da conta.
+const backupFn="function backupAll(){const a=document.createElement('a');a.href=window.URL.createObjectURL(new Blob([JSON.stringify({exportedAt:new Date().toISOString(),records,teamNotes,transactions},null,2)],{type:'application/json'}));a.download='bankrol-backup-'+todaySP()+'.json';a.click();setTimeout(()=>window.URL.revokeObjectURL(a.href),1000)}";
+once('<button id="syncNow" class="btn primary">Sincronizar agora</button></div></article>`;','<button id="syncNow" class="btn primary">Sincronizar agora</button></div></article><article class="card danger-zone"><div class="card-head"><div><div class="ey">ZONA DE PERIGO</div><h3>Apagar todos os dados</h3></div></div><p class="muted">Remove todas as análises, anotações e movimentações da Banca desta conta, em todos os aparelhos. Um backup em JSON é baixado antes.</p><div class="actions" style="margin-top:16px"><button id="resetAll" class="btn danger">Apagar todos os dados</button></div></article>`;','botao reset');
+once("$('#export').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(records,null,2)],{type:'application/json'}));a.download='bankrol-backup.json';a.click();URL.revokeObjectURL(a.href)}}","$('#export').onclick=backupAll;$('#resetAll').onclick=async()=>{if((prompt('Isso apaga todas as análises, anotações e movimentações. Digite APAGAR para confirmar.')||'').trim().toUpperCase()!=='APAGAR')return toast('Nada foi apagado');backupAll();records=[];teamNotes=[];transactions=[];notesEditing=null;txEditing=null;editing=null;bankFilter='all';resetAt=new Date().toISOString();write(K.x,resetAt);await save();toast('Todos os dados foram apagados');go('dash')}}"+backupFn,'acoes ajustes');
 
 // Navegação
 const navOld='<button data-page="notes">Anotações</button><button data-page="settings">Ajustes</button>';
@@ -43,7 +52,7 @@ const css=`
 .bank-house{cursor:pointer;transition:background .15s}.bank-house:hover{background:rgba(0,208,132,.05)}.bank-house.on{background:rgba(0,208,132,.1);box-shadow:inset 3px 0 0 var(--g)}
 .bank-tx-list{display:grid;gap:8px;max-height:460px;overflow-y:auto}.bank-tx{display:grid;grid-template-columns:34px 1fr auto auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--p2)}.bank-tx small{display:block;color:var(--mu);font-size:11px;margin-top:2px}
 .bank-tx-badge{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:900}.bank-tx-badge.deposit{background:rgba(0,208,132,.12);color:var(--g)}.bank-tx-badge.withdraw{background:rgba(255,102,94,.12);color:var(--r)}
-.bank-dot{fill:#07100f;stroke:var(--g)}
+.danger-zone{margin-top:14px;border-color:rgba(255,102,94,.35)}.bank-dot{fill:#07100f;stroke:var(--g)}
 @media(max-width:900px){.bank-grid{grid-template-columns:minmax(0,1fr)}.bank-tx{grid-template-columns:34px 1fr auto}.bank-tx .note-actions{grid-column:1/-1;justify-content:flex-end}}
 </style>`;
 once('</style>',css,'css banca');
