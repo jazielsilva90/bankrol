@@ -14,8 +14,8 @@ once('<main><header class="top">',`<main><div class="mobile-brand">${mark}<span 
 
 // iOS não usa SVG como ícone da tela inicial: publica PNGs e aponta os links para eles.
 for(const s of [32,180,512])fs.copyFileSync(`icons/icon-${s}.png`,`dist/icon-${s}.png`);
-html=html.replace(/<link rel="apple-touch-icon" href="[^"]*">/,'<link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png?v=1835"><link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png?v=1835"><link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=1835"><meta name="apple-mobile-web-app-title" content="Bankrol">');
-if(!html.includes('/icon-180.png?v=1835'))throw Error('apple-touch-icon não substituído');
+html=html.replace(/<link rel="apple-touch-icon" href="[^"]*">/,'<link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png?v=1835b"><link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png?v=1835b"><link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=1835b"><meta name="apple-mobile-web-app-title" content="Bankrol">');
+if(!html.includes('/icon-180.png?v=1835b'))throw Error('apple-touch-icon não substituído');
 
 once('</style>',`
 /* Logo no celular 1.8.35 */
